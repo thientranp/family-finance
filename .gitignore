@@ -1,0 +1,29 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Secrets and local environment (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Financial data and exports (never commit)
+*.xlsx
+*.csv
+*.bak
+*.dump
+backups/
+exports/
+03_Migration_Output/
+01_Source_Reports/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
