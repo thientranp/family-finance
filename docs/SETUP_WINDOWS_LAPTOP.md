@@ -1,146 +1,292 @@
-# Hướng dẫn cài đặt trên laptop cá nhân (Windows)
+# Hướng dẫn cài đặt trên laptop gia đình (Windows), từng bước
 
-Mục tiêu: cài đủ công cụ, lấy mã nguồn, khởi tạo Next.js, rồi tiếp tục dự án bằng Claude Code.
-
-Làm lần lượt từ phần 1 đến phần 8. Mỗi bước có điều kiện "xong khi" để bạn tự kiểm tra.
-
-> Chạy lệnh trong **Command Prompt (CMD)** hoặc **PowerShell**. Nếu lệnh `npm` báo lỗi "running scripts is disabled", dùng `npm.cmd` và `npx.cmd` thay cho `npm` và `npx`.
+Tài liệu này dẫn bạn từ máy trắng đến khi chạy được dự án. Làm đúng thứ tự, mỗi bước có mục **Xong khi** để bạn tự kiểm tra.
 
 ---
 
-## Phần 1. Cài Git for Windows
+## 0. Hiểu trước cấu trúc thư mục
 
-1. Tải từ https://git-scm.com/downloads/win và cài với mọi tùy chọn mặc định.
-2. Mở CMD, kiểm tra:
+Mọi thứ sẽ nằm trong **D:\FAMILY_FINANCES**:
+
+```
+D:\FAMILY_FINANCES\
+├── 01_Source_Reports\          ← chép từ USB (file Excel, file vay xe, ảnh)
+├── 02_Project_Documents\       ← chép từ USB (đặc tả, kế hoạch)
+└── family-finance\             ← mã nguồn, TẢI TỪ GITHUB (bước 4)
+    └── web\                    ← ứng dụng Next.js, TẠO Ở BƯỚC 6
+```
+
+Hai khái niệm cần biết:
+
+- **Clone** = tải toàn bộ mã nguồn từ GitHub về máy, tạo ra một thư mục mới chứa đủ code. Bạn không cần tạo dự án từ đầu.
+- **Mã nguồn (repo)** nằm trên GitHub. **Tài liệu gốc và dữ liệu thật** nằm trên USB. Hai phần này tách riêng, và không đưa tài liệu gốc lên GitHub.
+
+**Cách mở CMD:** nhấn phím `Windows`, gõ `cmd`, bấm **Command Prompt**. Cửa sổ có chữ đen, dòng đầu có dạng `C:\Users\...>`. Các lệnh trong hướng dẫn này đều chạy trong CMD, trừ bước 3.2 (dùng PowerShell).
+
+**Cách dán lệnh:** chuột phải vào cửa sổ CMD để dán, hoặc `Ctrl + V` (trong Windows 10 mới). Sau khi dán, nhấn `Enter`.
+
+---
+
+## Bước 1. Kiểm tra ổ D có tồn tại không
+
+1. Mở CMD, gõ:
+   ```
+   dir D:\
+   ```
+2. **Nếu thấy danh sách file/thư mục** → ổ D có. Đi tiếp bước 2.
+3. **Nếu báo "The system cannot find the drive specified"** → laptop không có ổ D. Thay tất cả `D:` bằng `C:` trong hướng dẫn này.
+
+**Xong khi:** bạn biết chắc mình dùng `D:` hay `C:`.
+
+---
+
+## Bước 2. Tạo thư mục gốc FAMILY_FINANCES
+
+Trong CMD, gõ lần lượt (mỗi dòng một lệnh, nhấn Enter sau mỗi dòng):
+
+```
+D:
+mkdir D:\FAMILY_FINANCES
+cd /d D:\FAMILY_FINANCES
+```
+
+- `D:` chuyển sang ổ D.
+- `mkdir` tạo thư mục mới.
+- `cd /d` đi vào thư mục đó.
+
+Gõ tiếp:
+```
+dir
+```
+
+**Xong khi:** dấu nhắc hiện `D:\FAMILY_FINANCES>` và lệnh `dir` không báo lỗi (có thể trống).
+
+---
+
+## Bước 3. Cài đặt công cụ
+
+### 3.1. Cài Git
+
+1. Vào https://git-scm.com/downloads/win, tải file cài đặt (tự động chọn bản Windows 64-bit).
+2. Mở file vừa tải, bấm **Next** liên tục đến khi **Install**, giữ nguyên mọi tùy chọn mặc định.
+3. Bấm **Finish**.
+4. **Đóng CMD cũ** (nếu đang mở), mở CMD mới, gõ:
    ```
    git --version
    ```
-   **Xong khi:** hiện số phiên bản, ví dụ `git version 2.x.x`.
 
-## Phần 2. Cài Node.js (bản LTS)
+**Xong khi:** hiện `git version 2.x.x`.
 
-1. Tải bản **LTS** từ https://nodejs.org và cài với mặc định (nhớ tick ô thêm vào PATH nếu có).
-2. Đóng hết CMD, mở CMD mới, kiểm tra:
+### 3.2. Cài Node.js (bản LTS)
+
+1. Vào https://nodejs.org, bấm nút **LTS** (bản khuyên dùng, không chọn "Current").
+2. Mở file cài đặt, bấm **Next** đến hết, giữ mặc định. Đảm bảo ô **Add to PATH** được tick.
+3. Đóng CMD, mở CMD mới, kiểm tra:
    ```
    node -v
    npm.cmd -v
    npm.cmd view next version
    ```
-   **Xong khi:** `node -v` hiện `v22.x` hoặc cao hơn, và lệnh `npm.cmd view next version` in ra một số phiên bản (ví dụ `16.x.x`).
 
-   **Nếu lệnh `npm.cmd view` báo lỗi 403 hoặc lỗi mạng:** dừng lại và gửi nội dung lỗi cho Claude. Không tiếp tục các bước sau.
+**Xong khi:**
+- `node -v` hiện `v22.x.x` hoặc cao hơn.
+- `npm.cmd view next version` in ra một số phiên bản (ví dụ `16.4.5`).
 
-## Phần 3. Cài Claude Code
+**Nếu `npm.cmd view` báo lỗi 403 hoặc lỗi mạng:** dừng và gửi tôi toàn bộ nội dung lỗi. Không làm tiếp bước 6.
 
-1. Mở CMD và chạy:
+Lưu ý: nếu gõ `npm -v` mà báo "running scripts is disabled", đó là lỗi PowerShell, không phải lỗi npm. Luôn dùng `npm.cmd` trong CMD thì không gặp lỗi này.
+
+### 3.3. Cài Claude Code
+
+1. Trong CMD, chạy:
    ```
    curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd
    ```
-2. Thêm thư mục cài vào PATH của tài khoản (không cần quyền admin). Mở PowerShell (không chạy quyền Administrator) và dán:
+2. Đợi đến khi thấy **Installation complete!**.
+3. Thêm Claude Code vào PATH cho tài khoản của bạn (không cần quyền admin). Mở **PowerShell** (gõ `PowerShell` trong ô tìm kiếm Windows, bấm mở, **không** chọn "Run as administrator"), rồi dán nguyên khối sau và nhấn Enter:
    ```powershell
    $p = [Environment]::GetEnvironmentVariable('Path','User')
-   if ($p -notlike '*\.local\bin*') { [Environment]::SetEnvironmentVariable('Path', "$p;C:\Users\$env:USERNAME\.local\bin", 'User') }
+   if ($p -notlike '*\.local\bin*') { [Environment]::SetEnvironmentVariable('Path', "$p;$env:USERPROFILE\.local\bin", 'User') }
    ```
-3. Đóng hết CMD và PowerShell, mở CMD mới, kiểm tra:
+4. Đóng **hết** cửa sổ CMD và PowerShell. Mở CMD mới, kiểm tra:
    ```
    claude --version
    ```
-   **Xong khi:** hiện `2.x.x (Claude Code)`.
 
-   Nếu vẫn báo "not recognized", dùng đường dẫn đầy đủ tạm thời: `"%USERPROFILE%\.local\bin\claude.exe" --version`.
+**Xong khi:** hiện `2.x.x (Claude Code)`.
 
-## Phần 4. Lấy mã nguồn từ GitHub
+**Nếu vẫn báo "not recognized":** dùng đường dẫn đầy đủ thay thế:
+```
+"%USERPROFILE%\.local\bin\claude.exe" --version
+```
 
-1. Chọn thư mục làm việc, ví dụ `C:\Projects`:
+---
+
+## Bước 4. Tải mã nguồn từ GitHub (clone)
+
+Đây là bước tạo thư mục dự án. Lệnh `git clone` sẽ tự tạo thư mục `family-finance` bên trong thư mục hiện tại.
+
+1. Trong CMD, đảm bảo bạn đang ở `D:\FAMILY_FINANCES`:
    ```
-   mkdir C:\Projects
-   cd /d C:\Projects
+   cd /d D:\FAMILY_FINANCES
+   ```
+2. Tải mã nguồn về:
+   ```
    git clone https://github.com/thientranp/family-finance
+   ```
+   - Lần đầu, Git có thể mở cửa sổ đăng nhập GitHub. Đăng nhập bằng tài khoản GitHub của bạn.
+   - Chờ đến khi thấy dòng `done.`
+3. Đi vào thư mục vừa tạo, chuyển sang nhánh đúng:
+   ```
    cd family-finance
    git checkout phase-1-supabase-schema
    ```
-   Nếu đã gộp vào `main`, bỏ dòng `git checkout`.
-2. Lần đầu clone, Git có thể mở cửa sổ đăng nhập GitHub. Đăng nhập bằng tài khoản của bạn.
-3. Kiểm tra:
+4. Kiểm tra:
    ```
-   git status
    git log --oneline -3
    ```
-   **Xong khi:** thấy commit "Phase 1: Supabase schema, ledger functions, RLS and local tests" ở đầu danh sách.
 
-## Phần 5. Chép thư mục tài liệu và dữ liệu nguồn
+**Xong khi:**
+- `dir` ở thư mục `D:\FAMILY_FINANCES\family-finance` thấy các mục như `supabase`, `scripts`, `docs`, `README.md`.
+- `git log` có dòng đầu tiên là `a3bc754 Docs: Windows laptop setup guide...` hoặc commit mới hơn.
 
-Các file này không có trên GitHub, phải chép thủ công từ USB:
+**Nếu `git clone` báo lỗi `destination path already exists`:** thư mục đã có sẵn. Chạy `dir D:\FAMILY_FINANCES`, nếu đã thấy `family-finance` thì chỉ cần `cd family-finance` rồi làm bước 3 của phần này.
 
-1. Tạo thư mục `C:\Projects\FAMILY_FINANCES`.
-2. Chép hai thư mục con vào đó:
-   - `01_Source_Reports` (file Excel gốc, file vay xe, ảnh tài khoản vay)
-   - `02_Project_Documents` (đặc tả yêu cầu, kế hoạch triển khai)
-3. **Không** chép các file này vào thư mục `family-finance`, và **không** đẩy chúng lên GitHub.
+---
 
-**Xong khi:** `C:\Projects\FAMILY_FINANCES\02_Project_Documents\REQUIREMENTS_SPECIFICATION.md` tồn tại.
+## Bước 5. Chép tài liệu và dữ liệu gốc từ USB
 
-## Phần 6. Khởi tạo Next.js trong thư mục con `web`
+1. Cắm USB. Giả sử USB là ổ `E:` (xem trong **This PC**). Kiểm tra trong CMD:
+   ```
+   dir E:\
+   ```
+   Thay `E:` bằng ký tự ổ USB thực tế của bạn.
+2. Chép hai thư mục (dùng lệnh sau, thay `E:` nếu cần):
+   ```
+   xcopy "E:\FAMILY_FINANCES\01_Source_Reports" "D:\FAMILY_FINANCES\01_Source_Reports\" /E /I
+   xcopy "E:\FAMILY_FINANCES\02_Project_Documents" "D:\FAMILY_FINANCES\02_Project_Documents\" /E /I
+   ```
+   Nếu USB không có sẵn thư mục `FAMILY_FINANCES` ở gốc, mở USB bằng File Explorer và kéo-thả hai thư mục con vào `D:\FAMILY_FINANCES`.
+3. Kiểm tra:
+   ```
+   dir D:\FAMILY_FINANCES\02_Project_Documents
+   ```
 
-Đặt ứng dụng vào thư mục `web` để không xung đột với các file có sẵn ở thư mục gốc.
+**Xong khi:** thấy file `REQUIREMENTS_SPECIFICATION.md` và `IMPLEMENTATION_PLAN.md`, và thư mục `01_Source_Reports` có file Excel.
 
-1. Trong thư mục `family-finance`, chạy:
+**Lưu ý:** các file này **không** được đặt trong `family-finance` và **không** được commit lên GitHub.
+
+---
+
+## Bước 6. Tạo ứng dụng Next.js trong thư mục `web`
+
+1. Đảm bảo bạn đang ở thư mục repo:
+   ```
+   cd /d D:\FAMILY_FINANCES\family-finance
+   ```
+2. Chạy lệnh tạo Next.js:
    ```
    npx.cmd create-next-app@latest web
    ```
-2. Trả lời các câu hỏi (trình tự có thể khác tùy phiên bản, chọn như sau):
-   - TypeScript: **Yes**
-   - ESLint: **Yes**
-   - Tailwind CSS: **Yes**
-   - `src/` directory: **Yes**
-   - App Router: **Yes**
-   - Turbopack: **Yes** hoặc **No** đều được
-   - Import alias: **Yes** (mặc định `@/*`)
-   - Gói quản lý: **npm**
-3. Kiểm tra chạy được:
+3. Trả lời các câu hỏi xuất hiện (chọn theo bảng sau; các câu hỏi có thể khác chút tùy phiên bản):
+
+   | Câu hỏi | Chọn |
+   |---|---|
+   | Would you like to use TypeScript? | **Yes** |
+   | Would you like to use ESLint? | **Yes** |
+   | Would you like to use Tailwind CSS? | **Yes** |
+   | Would you like your code inside a `src/` directory? | **Yes** |
+   | Would you like to use App Router? | **Yes** |
+   | Would you like to use Turbopack? | **Yes** (hoặc No, đều được) |
+   | Would you like to customize the import alias? | **No** (mặc định `@/*`) |
+   | Which package manager? | **npm** |
+
+4. Khi cài xong, kiểm tra ứng dụng chạy được:
    ```
    cd web
    npm.cmd run build
+   ```
+   Đợi đến khi thấy dòng `Compiled successfully` hoặc bảng thống kê trang, không có chữ `Failed`.
+
+5. Chạy thử trên trình duyệt:
+   ```
    npm.cmd run dev
    ```
-   Mở trình duyệt tại `http://localhost:3000`. **Xong khi:** thấy trang mặc định của Next.js.
-4. Dừng máy chủ bằng `Ctrl + C`, rồi quay lại thư mục gốc:
+   Mở trình duyệt, vào `http://localhost:3000`. Thấy trang mặc định của Next.js là thành công.
+6. Dừng máy chủ: nhấn `Ctrl + C`, gõ `Y` nếu được hỏi, rồi Enter.
+7. Quay về thư mục repo:
    ```
    cd ..
    ```
 
-## Phần 7. Thêm cấu hình Supabase (không đưa lên GitHub)
-
-1. Tạo file `web\.env.local` (nội dung lấy từ Supabase, Project Settings → API, theo mục 2 của `docs/SUPABASE_SETUP_GUIDE.md`):
-   ```
-   NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=dán-khóa-anon-public-vào-đây
-   ```
-2. **Tuyệt đối không** ghi khóa `service_role` vào đây hoặc vào bất kỳ file nào trong dự án.
-3. Kiểm tra file này không bị đưa vào Git:
-   ```
-   git status
-   ```
-   **Xong khi:** `web/.env.local` không xuất hiện trong danh sách thay đổi. (`.gitignore` đã chặn `.env.*`.)
-
-## Phần 8. Khởi động Claude Code và tiếp tục dự án
-
-1. Ở thư mục `C:\Projects\family-finance`, chạy:
-   ```
-   claude
-   ```
-2. Lần đầu, đăng nhập bằng tài khoản Claude trả phí khi trình duyệt mở ra.
-3. Gửi cho Claude câu lệnh sau:
-   ```
-   Đọc CLAUDE.md, docs/SUPABASE_SETUP_GUIDE.md và docs/SETUP_WINDOWS_LAPTOP.md.
-   Tài liệu đặc tả và kế hoạch nằm ở C:\Projects\FAMILY_FINANCES\02_Project_Documents.
-   Sau đó cho tôi biết bước tiếp theo theo kế hoạch giai đoạn 1.
-   ```
+**Xong khi:** `npm.cmd run build` thành công và trang `localhost:3000` hiện được.
 
 ---
 
-## Lưu ý quan trọng
+## Bước 7. Thêm cấu hình Supabase (chỉ làm trên máy gia đình)
 
-- **Dữ liệu thật** (số dư, giao dịch, file vay) chỉ để trong `C:\Projects\FAMILY_FINANCES`. Không đưa vào repo.
-- **Khóa bí mật** (`service_role`, mật khẩu database, file `.env.local`) không bao giờ được commit hoặc gửi trong chat.
-- Nếu gặp lỗi ở bất kỳ bước nào, ghi lại đúng bước và nội dung lỗi, rồi gửi cho Claude.
+1. Lấy hai giá trị từ Supabase: vào project, **Project Settings → API**:
+   - **Project URL** (dạng `https://xxxxxxxx.supabase.co`)
+   - **anon public key** (chuỗi dài, **không** phải khóa `service_role`)
+2. Mở **Notepad**, dán nội dung sau, thay hai giá trị:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=dán-khóa-anon-vào-đây
+   ```
+3. Lưu file với tên **đúng** là `.env.local` vào thư mục `D:\FAMILY_FINANCES\family-finance\web`:
+   - Trong Notepad, chọn **File → Save As**.
+   - Ô **Save as type**: chọn **All Files (*.*)**.
+   - Ô **File name**: gõ `.env.local` (có dấu chấm ở đầu).
+   - Đường dẫn: `D:\FAMILY_FINANCES\family-finance\web`.
+4. Kiểm tra file không bị đưa vào Git:
+   ```
+   cd /d D:\FAMILY_FINANCES\family-finance
+   git status
+   ```
+   **Xong khi:** `.env.local` **không** xuất hiện trong danh sách.
+
+**Không bao giờ** ghi khóa `service_role` vào file này.
+
+---
+
+## Bước 8. Khởi động Claude Code và tiếp tục dự án
+
+1. Trong CMD:
+   ```
+   cd /d D:\FAMILY_FINANCES\family-finance
+   claude
+   ```
+2. Lần đầu, trình duyệt sẽ mở để bạn đăng nhập tài khoản Claude (gói trả phí). Đăng nhập và cho phép kết nối.
+3. Khi có dấu nhắc của Claude Code, gõ:
+   ```
+   Đọc CLAUDE.md, docs/SUPABASE_SETUP_GUIDE.md và docs/SETUP_WINDOWS_LAPTOP.md.
+   Tài liệu đặc tả và kế hoạch nằm ở D:\FAMILY_FINANCES\02_Project_Documents.
+   Sau đó cho tôi biết trạng thái dự án và bước tiếp theo.
+   ```
+
+**Xong khi:** Claude trả lời và tóm tắt được trạng thái dự án.
+
+---
+
+## Tóm tắt: các thư mục sau khi làm xong
+
+| Thư mục | Chứa gì | Nguồn |
+|---|---|---|
+| `D:\FAMILY_FINANCES\01_Source_Reports` | File Excel, file vay xe, ảnh | Chép từ USB |
+| `D:\FAMILY_FINANCES\02_Project_Documents` | Đặc tả, kế hoạch | Chép từ USB |
+| `D:\FAMILY_FINANCES\family-finance` | Mã nguồn dự án | `git clone` từ GitHub |
+| `D:\FAMILY_FINANCES\family-finance\web` | Ứng dụng Next.js | Tạo ở bước 6 |
+
+---
+
+## Lỗi thường gặp
+
+| Lỗi | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| `'git' is not recognized` | Chưa cài Git, hoặc chưa mở CMD mới sau khi cài | Cài lại Git (bước 3.1), mở CMD mới |
+| `running scripts is disabled` | Đang dùng PowerShell với lệnh `npm` | Dùng `npm.cmd` thay `npm` |
+| `403` khi chạy `npm.cmd` | Chính sách mạng chặn npm | Dừng, gửi tôi nội dung lỗi |
+| `'claude' is not recognized` | Chưa thêm PATH | Làm bước 3.3, hoặc dùng đường dẫn đầy đủ |
+| `destination path already exists` | Đã clone rồi | `cd family-finance` rồi tiếp tục |
+
+Nếu gặp lỗi không có trong bảng, ghi lại **đúng bước** và **nguyên văn nội dung lỗi**, rồi gửi cho tôi.
