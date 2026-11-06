@@ -190,7 +190,7 @@ var ICON={
   box:'<path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>'
 };
 var WALLET_ICON={cash:'cash',bank:'bank',savings:'savings',held_in_trust:'trust'};
-var KIND_ICON={income:'up',refund:'up',asset_sale:'up',expense:'down',asset_purchase:'down',transfer:'swap',adjustment:'sliders',loan_payment:'card',liability_adjustment:'sliders',reversal:'undo'};
+var KIND_ICON={income:'up',refund:'up',asset_sale:'up',expense:'down',asset_purchase:'down',transfer:'swap',adjustment:'sliders',loan_payment:'card',liability_adjustment:'sliders',reversal:'undo',debt_lend:'down',debt_borrow:'up',debt_collect:'up',debt_repay:'down',debt_adjustment:'sliders'};
 function iconBadge(iconKey,tone){
   return h('span',{class:'ibadge '+(tone||'')},[svg(ICON[iconKey]||ICON.box)]);
 }
@@ -284,7 +284,7 @@ function renderHomeData(d){
   var kids=[header('Tổng quan')];
   kids.push(h('div',{class:'card hero'},[
     h('div',{class:'lbl',text:'Tài sản ròng'}),h('div',{class:'big',text:fmt(d.net_worth)}),
-    h('div',{class:'sub'},[h('span',{text:'Tiền khả dụng '+fmt(d.cash_available)}),h('span',{text:'Tiết kiệm '+fmt(d.savings)}),h('span',{text:'Tài sản '+fmt(d.assets)}),h('span',{text:'Nợ '+fmt(d.liabilities)})]),
+    h('div',{class:'sub'},[h('span',{text:'Tiền khả dụng '+fmt(d.cash_available)}),h('span',{text:'Tiết kiệm '+fmt(d.savings)}),h('span',{text:'Tài sản '+fmt(d.assets)}),d.receivables?h('span',{text:'Người khác còn nợ '+fmt(d.receivables)}):null,h('span',{text:'Nợ '+fmt(d.liabilities)})]),
     d.held_in_trust?h('div',{class:'sub',style:'margin-top:6px'},[h('span',{text:'Tiền giữ hộ (không tính vào tài sản ròng): '+fmt(d.held_in_trust)})]):null
   ]));
   kids.push(periodNav(renderHome));
@@ -376,7 +376,7 @@ function txnDetail(t){
 }
 
 /* Add (quick entry) */
-var ADD_KINDS=[['expense','Chi'],['income','Thu'],['transfer','Chuyển ví'],['adjustment','Đối soát ví'],['loan_payment','Trả nợ'],['asset_purchase','Mua tài sản'],['asset_sale','Bán tài sản']];
+var ADD_KINDS=[['expense','Chi'],['income','Thu'],['transfer','Chuyển ví'],['adjustment','Đối soát ví'],['debt_new','Nợ mới'],['debt_settle','Thu/Trả nợ'],['loan_payment','Trả nợ'],['asset_purchase','Mua tài sản'],['asset_sale','Bán tài sản']];
 // Bấm để đổi người chi, thay cho dropdown — dùng cho form "Chi".
 function memberToggle(selectedId){
   var wrap=h('div',{class:'toggle2',role:'group','aria-label':'Người chi'});
@@ -391,8 +391,10 @@ function memberToggle(selectedId){
 }
 function renderAdd(){
   var kind=S.view.addKind||'expense';
-  var needData=(kind==='loan_payment'||kind==='asset_purchase'||kind==='asset_sale');
-  if(needData&&!S.view.assets){ loading(); api('assets').then(function(a){S.view.assets=a;renderAdd();},function(e){fail(e,renderAdd);}); return; }
+  var needAssets=(kind==='loan_payment'||kind==='asset_purchase'||kind==='asset_sale');
+  var needDebts=(kind==='debt_settle');
+  if(needAssets&&!S.view.assets){ loading(); api('assets').then(function(a){S.view.assets=a;renderAdd();},function(e){fail(e,renderAdd);}); return; }
+  if(needDebts&&!S.view.debts){ loading(); api('debts').then(function(d){S.view.debts=d;renderAdd();},function(e){fail(e,renderAdd);}); return; }
   var key=S.view.addKey||(S.view.addKey=uid());
   var chips=h('div',{class:'chips',role:'group','aria-label':'Loại giao dịch'},ADD_KINDS.map(function(k){
     return h('button',{class:'chip',type:'button','aria-pressed':String(k[0]===kind),text:k[1],onclick:function(){S.view.addKind=k[0];S.view.addKey=null;renderAdd();}});
@@ -437,6 +439,32 @@ function renderAdd(){
       form.append(fld('Số tiền trả (gốc + lãi)',amt),fld('Khoản vay',li),fld('Trả từ ví',wal4),fld('Ngày',date),fld('Ghi chú',note));
       payload=function(){ return {date:date.value,amount:amt.getNumber(),wallet_id:wal4.value,liability_id:li.value,note:note.value,key:key}; };
     }
+  } else if(kind==='debt_new'){
+    var dir=S.view.debtDir||'lend';
+    var dirWrap=h('div',{class:'toggle2',role:'group','aria-label':'Chiều nợ'},[
+      h('button',{type:'button','aria-pressed':String(dir==='lend'),text:'Cho vay',onclick:function(){S.view.debtDir='lend';renderAdd();}}),
+      h('button',{type:'button','aria-pressed':String(dir==='borrow'),text:'Vay nợ',onclick:function(){S.view.debtDir='borrow';renderAdd();}})
+    ]);
+    var cp=h('input',{id:'cp',maxlength:'120',placeholder:dir==='lend'?'Tên người vay':'Tên người cho vay'});
+    var walD=selectEl(walletOpts(),S.view.lastWallet||'','wal');
+    form.append(fld('Chiều',dirWrap),fld('Số tiền',amt),fld(dir==='lend'?'Người vay':'Người cho vay',cp),fld(dir==='lend'?'Trừ từ ví':'Nhận vào ví',walD),
+      h('div',{class:'hint',text:dir==='lend'?'Cho vay: trừ tiền ví ngay, không tính chi tiêu. Không tính lãi suất.':'Vay nợ: cộng tiền ví ngay, không tính thu nhập. Không tính lãi suất.'}),
+      fld('Ngày',date),fld('Ghi chú',note));
+    payload=function(){ return {direction:dir,date:date.value,amount:amt.getNumber(),wallet_id:walD.value,counterparty:cp.value,note:note.value,key:key}; };
+  } else if(kind==='debt_settle'){
+    var openDebts=S.view.debts.debts.filter(function(x){return x.status==='active';});
+    if(!openDebts.length){ form.append(h('div',{class:'empty',text:'Chưa có khoản nợ cá nhân nào đang mở. Ghi ở "Nợ mới" trước.'})); payload=null; }
+    else{
+      var presetId=S.view.debtSettleId||''; S.view.debtSettleId=null;
+      var dsel=selectEl(openDebts.map(function(x){return {v:x.debt_id,t:x.counterparty+' — còn '+fmt(x.balance)+' ('+(x.direction==='lend'?'họ nợ mình':'mình nợ họ')+')'};}),presetId,'debt');
+      var walS=selectEl(walletOpts(),S.view.lastWallet||'','wal');
+      var lbl=h('div',{class:'hint'});
+      function curDebt(){ return openDebts.filter(function(x){return x.debt_id===dsel.value;})[0]; }
+      function updLbl(){ var d=curDebt(); lbl.textContent=d?(d.direction==='lend'?'Thu nợ: cộng tiền vào ví, giảm số tiền họ còn nợ mình.':'Trả nợ: trừ tiền khỏi ví, giảm số tiền mình còn nợ họ.'):''; }
+      dsel.addEventListener('change',updLbl); updLbl();
+      form.append(fld('Khoản nợ',dsel),fld('Số tiền',amt),fld('Ví',walS),lbl,fld('Ngày',date),fld('Ghi chú',note));
+      payload=function(){ var d=curDebt(); return {_dir:d&&d.direction,date:date.value,amount:amt.getNumber(),wallet_id:walS.value,debt_id:dsel.value,note:note.value,key:key}; };
+    }
   } else if(kind==='asset_purchase'||kind==='asset_sale'){
     var as=S.view.assets.assets.filter(function(a){return a.active===1&&(kind==='asset_purchase'||!a.sold);});
     if(!as.length){ form.append(h('div',{class:'empty',text:'Chưa có tài sản. Thêm ở Thêm → Tài sản & nợ.'})); payload=null; }
@@ -446,14 +474,17 @@ function renderAdd(){
       payload=function(){ return {date:date.value,amount:amt.getNumber(),wallet_id:wal5.value,asset_id:asel.value,note:note.value,key:key}; };
     }
   }
-  var apiName={expense:'expense',income:'income',transfer:'transfer',refund:'refund',adjustment:'adjust',loan_payment:'loanPay',asset_purchase:'assetBuy',asset_sale:'assetSell'}[kind];
+  var apiName={expense:'expense',income:'income',transfer:'transfer',refund:'refund',adjustment:'adjust',debt_new:'debtNew',loan_payment:'loanPay',asset_purchase:'assetBuy',asset_sale:'assetSell'}[kind];
   var kids=[header('Nhập giao dịch'),chips,h('div',{class:'card'},[form,err])];
   if(payload){
     kids[2].appendChild(submitBtn('Lưu giao dịch',function(){
       var p=payload();
-      return api(apiName,p).then(function(r){
+      var an=apiName;
+      if(kind==='debt_settle'){ an=(p._dir==='lend')?'debtCollect':'debtRepay'; delete p._dir; }
+      return api(an,p).then(function(r){
         if(p.wallet_id)S.view.lastWallet=p.wallet_id;
         S.view.addKey=null; S.view.assets=null;
+        if(kind==='debt_new'||kind==='debt_settle')S.view.debts=null;
         invalidateCache();
         toast(r.duplicate?'Giao dịch này đã được ghi trước đó':'Đã lưu giao dịch');
         return reloadBoot().then(function(){ renderAdd(); });
@@ -532,14 +563,50 @@ function renderMore(){
   var sub=S.view.more;
   if(sub==='wallets')return renderWallets();
   if(sub==='assets')return renderAssets();
+  if(sub==='debts')return renderDebts();
   if(sub==='config')return renderConfig();
   if(sub==='system')return renderSystem();
   function item(label,desc,key){ return h('button',{class:'tap card',type:'button',onclick:function(){S.view.more=key;renderMore();}},[h('div',{class:'t',style:'font-weight:600',text:label}),h('div',{class:'s',style:'color:var(--muted);font-size:.85rem',text:desc})]); }
   $app.replaceChildren(header('Thêm'),
     item('Ví','Số dư, thêm ví, đối soát, số dư đầu kỳ','wallets'),
     item('Tài sản & nợ','Nhà, xe, vàng, khoản vay, tài sản ròng','assets'),
+    item('Nợ cá nhân','Cho vay, vay nợ với người quen — không tính lãi','debts'),
     item('Danh mục, lọ & nhắc nhở','Cấu hình lọ ngân sách, danh mục, nhắc hóa đơn','config'),
     item('Hệ thống','Kiểm tra toàn vẹn, sao lưu, phiên bản','system'));
+}
+function renderDebts(){
+  loading();
+  api('debts').then(function(d){
+    S.view.debts=d;
+    var kids=[backBar('Nợ cá nhân')];
+    kids.push(h('div',{class:'card hero'},[h('div',{class:'lbl',text:'Tổng quan'}),
+      h('div',{class:'sub',style:'margin-top:6px'},[h('span',{text:'Họ còn nợ mình '+fmt(d.total_receivable)}),h('span',{text:'Mình còn nợ họ '+fmt(d.total_payable)})])]));
+    var c=h('div',{class:'card'});
+    if(!d.debts.length)c.appendChild(h('div',{class:'empty',text:'Chưa có khoản nợ cá nhân nào.'}));
+    d.debts.forEach(function(x){
+      c.appendChild(h('button',{class:'tap',type:'button',onclick:function(){debtSheet(x);}},[
+        h('div',{class:'row has-icon',style:x.status==='closed'?'opacity:.55':null},[
+          iconBadge(x.direction==='lend'?'up':'down',x.direction==='lend'?'inc':'exp'),
+          h('div',{class:'l'},[h('div',{class:'t',text:x.counterparty}),h('div',{class:'s',text:(x.direction==='lend'?'Cho vay':'Vay nợ')+' · '+dmy(x.opening_date)+(x.status==='closed'?' · đã xong':'')})]),
+          h('div',{class:'r',text:fmt(x.balance)})])]));
+    });
+    kids.push(c,h('button',{class:'btn primary block',type:'button',text:'Ghi khoản nợ mới',onclick:function(){S.view.addKind='debt_new';S.view.addKey=null;go('add');}}));
+    $app.replaceChildren.apply($app,kids);
+  },function(e){fail(e,renderDebts);});
+}
+function debtSheet(d){
+  var sh;
+  var body=h('div',null,[
+    h('div',{class:'row'},[h('span',{class:'s',text:'Chiều'}),h('span',{text:d.direction==='lend'?'Cho vay (họ nợ mình)':'Vay nợ (mình nợ họ)'})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'Số tiền gốc'}),h('strong',{text:fmt(d.original_amount)})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'Còn lại'}),h('strong',{text:fmt(d.balance)})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'Ngày'}),h('span',{text:dmy(d.opening_date)})]),
+    d.note?h('div',{class:'hint',text:d.note}):null
+  ]);
+  if(d.balance>0){
+    body.appendChild(h('button',{class:'btn primary block',type:'button',text:d.direction==='lend'?'Thu nợ':'Trả nợ',onclick:function(){sh.close();S.view.addKind='debt_settle';S.view.addKey=null;S.view.debtSettleId=d.debt_id;go('add');}}));
+  }
+  sh=openSheet(d.counterparty,body);
 }
 function backBar(title){ return h('div',{class:'top'},[h('button',{class:'btn',type:'button',text:'‹ Quay lại',onclick:function(){S.view.more=null;renderMore();}}),h('strong',{text:title})]); }
 

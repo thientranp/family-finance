@@ -60,7 +60,11 @@ function liabilityBalances_() {
   return st.liabBal;
 }
 
-// Net worth = wallets (excluding held-in-trust) + assets at purchase price (not sold, active) - liabilities.
+// Net worth = wallets (excluding held-in-trust) + assets at purchase price (not sold, active)
+// + personal receivables (nợ cá nhân người khác còn nợ gia đình) - liabilities (bank loans +
+// personal payables, nợ cá nhân gia đình còn nợ người khác). Treating personal lend/borrow as a
+// standard receivable/payable is the ordinary accounting default; flag it to the user if they'd
+// rather see it broken out differently.
 // Held-in-trust money is somebody else's: reported separately, never part of net worth (REQ-018).
 function netWorth_() {
   var st = buildState_();
@@ -75,9 +79,18 @@ function netWorth_() {
   readAll_('Assets').forEach(function (a) {
     if (a.active === 1 && !st.assetSale[a.asset_id]) assets += a.purchase_value;
   });
-  var debts = 0;
-  Object.keys(st.liabs).forEach(function (id) { debts += st.liabBal[id]; });
-  return { cash: cash, savings: savings, assets: assets, liabilities: debts, held_in_trust: trust, net_worth: cash + savings + assets - debts };
+  var bankDebt = 0;
+  Object.keys(st.liabs).forEach(function (id) { bankDebt += st.liabBal[id]; });
+  var receivable = 0, payable = 0;
+  Object.keys(st.debts).forEach(function (id) {
+    var b = st.debtBal[id];
+    if (st.debts[id].direction === 'lend') receivable += b; else payable += b;
+  });
+  var liabilities = bankDebt + payable;
+  return {
+    cash: cash, savings: savings, assets: assets, receivables: receivable, liabilities: liabilities,
+    held_in_trust: trust, net_worth: cash + savings + assets + receivable - liabilities
+  };
 }
 
 function assetsView_() {

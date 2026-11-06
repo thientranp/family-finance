@@ -12,7 +12,12 @@ var FF_KINDS = {
   loan_payment: 'Trả nợ vay',
   liability_adjustment: 'Điều chỉnh dư nợ',
   asset_purchase: 'Mua tài sản',
-  asset_sale: 'Bán tài sản'
+  asset_sale: 'Bán tài sản',
+  debt_lend: 'Cho vay',
+  debt_borrow: 'Vay nợ',
+  debt_collect: 'Thu nợ',
+  debt_repay: 'Trả nợ cá nhân',
+  debt_adjustment: 'Điều chỉnh nợ cá nhân'
 };
 
 // ---------- State ----------
@@ -20,12 +25,16 @@ var FF_KINDS = {
 // balance-dependent rules (adjustments, loan overpay) see earlier items of the same batch.
 function buildState_() {
   var st = {
-    wallets: {}, liabs: {}, txnMap: {}, entriesBy: {}, lentriesBy: {},
+    wallets: {}, liabs: {}, debts: {}, txnMap: {}, entriesBy: {}, lentriesBy: {}, dentriesBy: {},
     reversedBy: {}, keyMap: {}, assetSale: {}, lastHash: 'GENESIS',
-    walletBal: {}, liabBal: {}, txnList: readAll_('Transactions')
+    walletBal: {}, liabBal: {}, debtBal: {}, txnList: readAll_('Transactions')
   };
   readAll_('Wallets').forEach(function (w) { st.wallets[w.wallet_id] = w; st.walletBal[w.wallet_id] = w.opening_balance || 0; });
   readAll_('Liabilities').forEach(function (l) { st.liabs[l.liability_id] = l; st.liabBal[l.liability_id] = l.opening_balance || 0; });
+  // Debts (nợ cá nhân) have no opening_balance column: the balance starts at 0 and the first
+  // debt_lend/debt_borrow entry brings it up to the original amount, so reversing that entry
+  // correctly zeroes it back out (unlike bank Liabilities, which assume a pre-existing balance).
+  readAll_('Debts').forEach(function (d) { st.debts[d.debt_id] = d; st.debtBal[d.debt_id] = 0; });
   st.txnList.forEach(function (t) {
     st.txnMap[t.txn_id] = t;
     if (t.reverses_id) st.reversedBy[t.reverses_id] = t.txn_id;
@@ -43,6 +52,10 @@ function buildState_() {
     (st.lentriesBy[e.txn_id] = st.lentriesBy[e.txn_id] || []).push(e);
     applyLentryToState_(st, e, st.txnMap[e.txn_id]);
   });
+  readAll_('DebtEntries').forEach(function (e) {
+    (st.dentriesBy[e.txn_id] = st.dentriesBy[e.txn_id] || []).push(e);
+    applyDentryToState_(st, e, st.txnMap[e.txn_id]);
+  });
   return st;
 }
 
@@ -56,30 +69,37 @@ function applyLentryToState_(st, e, t) {
   if (t && l && t.txn_date >= l.opening_date) st.liabBal[e.liability_id] += e.amount;
 }
 
+function applyDentryToState_(st, e, t) {
+  var d = st.debts[e.debt_id];
+  if (t && d && t.txn_date >= d.opening_date) st.debtBal[e.debt_id] += e.amount;
+}
+
 // ---------- Hash chain ----------
-function canon_(t, ents, lents) {
+function canon_(t, ents, lents, dents) {
   var f = [t.txn_id, t.txn_kind, t.txn_date, t.amount, t.category_id, t.jar_id, t.paid_by, t.beneficiary,
     t.note, t.reason, t.balance_before, t.balance_after, t.reverses_id, t.ref_id, t.idempotency_key,
     t.entry_count, t.created_by, t.created_at].map(function (v) { return v === null || v === undefined ? '' : String(v); });
   var e = ents.map(function (x) { return x.wallet_id + ':' + x.amount; });
   var l = lents.map(function (x) { return x.liability_id + ':' + x.amount; });
-  return JSON.stringify([f, e, l]);
+  var d = (dents || []).map(function (x) { return x.debt_id + ':' + x.amount; });
+  return JSON.stringify([f, e, l, d]);
 }
 
-function hashOf_(prev, t, ents, lents) { return sha256Hex_(prev + '|' + canon_(t, ents, lents)); }
+function hashOf_(prev, t, ents, lents, dents) { return sha256Hex_(prev + '|' + canon_(t, ents, lents, dents)); }
 
 // ---------- Shape rules (used when posting AND when scanning stored data) ----------
 // Returns a list of problems (empty = OK). orig = {txn, ents, lents} for reversals.
-function shapeIssues_(t, ents, lents, orig) {
+function shapeIssues_(t, ents, lents, dents, orig) {
+  dents = dents || [];
   var p = [];
   var k = t.txn_kind;
   var amt = t.amount;
   if (!FF_KINDS[k]) return ['Loại giao dịch không hợp lệ: ' + k];
   if (typeof amt !== 'number' || !Number.isSafeInteger(amt) || amt <= 0) p.push('Số tiền phải là số nguyên dương.');
   if (!isYmd_(t.txn_date)) p.push('Ngày không hợp lệ.');
-  var ne = ents.length, nl = lents.length;
+  var ne = ents.length, nl = lents.length, nd = dents.length;
   function one(sign) {
-    if (ne !== 1 || nl !== 0) { p.push('Cần đúng 1 dòng ví.'); return; }
+    if (ne !== 1 || nl !== 0 || nd !== 0) { p.push('Cần đúng 1 dòng ví.'); return; }
     if (ents[0].amount !== sign * amt) p.push('Dòng ví không khớp số tiền.');
   }
   switch (k) {
@@ -87,28 +107,48 @@ function shapeIssues_(t, ents, lents, orig) {
     case 'refund': one(1); break;
     case 'expense': case 'asset_purchase': one(-1); break;
     case 'transfer':
-      if (ne !== 2 || nl !== 0) p.push('Chuyển ví cần đúng 2 dòng ví.');
+      if (ne !== 2 || nl !== 0 || nd !== 0) p.push('Chuyển ví cần đúng 2 dòng ví.');
       else {
         if (ents[0].amount !== -amt || ents[1].amount !== amt) p.push('Hai dòng chuyển ví phải bằng nhau và ngược dấu.');
         if (ents[0].wallet_id === ents[1].wallet_id) p.push('Hai ví phải khác nhau.');
       }
       break;
     case 'adjustment':
-      if (ne !== 1 || nl !== 0) p.push('Điều chỉnh cần đúng 1 dòng ví.');
+      if (ne !== 1 || nl !== 0 || nd !== 0) p.push('Điều chỉnh cần đúng 1 dòng ví.');
       else if (ents[0].amount === 0 || Math.abs(ents[0].amount) !== amt) p.push('Dòng điều chỉnh không khớp số tiền.');
       else if (t.balance_before === null || t.balance_after === null || t.balance_after - t.balance_before !== ents[0].amount) p.push('Số dư trước/sau không khớp mức điều chỉnh.');
       if (!t.reason || !String(t.reason).trim()) p.push('Điều chỉnh bắt buộc có lý do.');
       break;
     case 'loan_payment':
-      if (ne !== 1 || nl !== 1) p.push('Trả nợ cần 1 dòng ví và 1 dòng nợ.');
+      if (ne !== 1 || nl !== 1 || nd !== 0) p.push('Trả nợ cần 1 dòng ví và 1 dòng nợ.');
       else if (ents[0].amount !== -amt || lents[0].amount !== -amt) p.push('Dòng trả nợ không khớp số tiền.');
       if (!t.ref_id) p.push('Thiếu khoản vay.');
       break;
     case 'liability_adjustment':
-      if (ne !== 0 || nl !== 1) p.push('Điều chỉnh dư nợ cần đúng 1 dòng nợ.');
+      if (ne !== 0 || nl !== 1 || nd !== 0) p.push('Điều chỉnh dư nợ cần đúng 1 dòng nợ.');
       else if (lents[0].amount === 0 || Math.abs(lents[0].amount) !== amt) p.push('Dòng điều chỉnh nợ không khớp số tiền.');
       else if (t.balance_before === null || t.balance_after === null || t.balance_after - t.balance_before !== lents[0].amount) p.push('Dư nợ trước/sau không khớp mức điều chỉnh.');
       if (!t.reason || !String(t.reason).trim()) p.push('Điều chỉnh dư nợ bắt buộc có lý do.');
+      break;
+    case 'debt_lend': case 'debt_borrow':
+      if (ne !== 1 || nl !== 0 || nd !== 1) { p.push('Cần đúng 1 dòng ví và 1 dòng nợ cá nhân.'); break; }
+      var dsign = k === 'debt_lend' ? -1 : 1;
+      if (ents[0].amount !== dsign * amt) p.push('Dòng ví không khớp số tiền.');
+      if (dents[0].amount !== amt) p.push('Dòng nợ cá nhân không khớp số tiền.');
+      if (!t.ref_id) p.push('Thiếu khoản nợ cá nhân.');
+      break;
+    case 'debt_collect': case 'debt_repay':
+      if (ne !== 1 || nl !== 0 || nd !== 1) { p.push('Cần đúng 1 dòng ví và 1 dòng nợ cá nhân.'); break; }
+      var csign = k === 'debt_collect' ? 1 : -1;
+      if (ents[0].amount !== csign * amt) p.push('Dòng ví không khớp số tiền.');
+      if (dents[0].amount !== -amt) p.push('Dòng nợ cá nhân không khớp số tiền.');
+      if (!t.ref_id) p.push('Thiếu khoản nợ cá nhân.');
+      break;
+    case 'debt_adjustment':
+      if (ne !== 0 || nl !== 0 || nd !== 1) p.push('Điều chỉnh nợ cá nhân cần đúng 1 dòng nợ.');
+      else if (dents[0].amount === 0 || Math.abs(dents[0].amount) !== amt) p.push('Dòng điều chỉnh nợ cá nhân không khớp số tiền.');
+      else if (t.balance_before === null || t.balance_after === null || t.balance_after - t.balance_before !== dents[0].amount) p.push('Số dư nợ cá nhân trước/sau không khớp mức điều chỉnh.');
+      if (!t.reason || !String(t.reason).trim()) p.push('Điều chỉnh nợ cá nhân bắt buộc có lý do.');
       break;
     case 'reversal':
       if (!t.reverses_id) p.push('Thiếu giao dịch gốc.');
@@ -123,6 +163,9 @@ function shapeIssues_(t, ents, lents, orig) {
         var c = lents.map(function (x) { return x.liability_id + ':' + x.amount; }).sort().join(',');
         var d = orig.lents.map(function (x) { return x.liability_id + ':' + (-x.amount); }).sort().join(',');
         if (c !== d) p.push('Dòng nợ của bút toán đảo không đối xứng với giao dịch gốc.');
+        var g = dents.map(function (x) { return x.debt_id + ':' + x.amount; }).sort().join(',');
+        var h = (orig.dents || []).map(function (x) { return x.debt_id + ':' + (-x.amount); }).sort().join(',');
+        if (g !== h) p.push('Dòng nợ cá nhân của bút toán đảo không đối xứng với giao dịch gốc.');
       }
       break;
   }
@@ -130,7 +173,7 @@ function shapeIssues_(t, ents, lents, orig) {
   if ((k === 'expense' || k === 'refund') && !t.jar_id) p.push('Thiếu lọ ngân sách.');
   if (k !== 'expense' && k !== 'refund' && k !== 'reversal' && t.jar_id) p.push('Loại này không được gắn lọ.');
   if (k !== 'reversal' && t.reverses_id) p.push('Chỉ bút toán đảo mới có giao dịch gốc.');
-  if (t.entry_count !== ne + nl) p.push('Số dòng sổ cái không khớp entry_count.');
+  if (t.entry_count !== ne + nl + nd) p.push('Số dòng sổ cái không khớp entry_count.');
   return p;
 }
 
@@ -197,7 +240,7 @@ function planPost_(st, memberId, spec) {
     balance_before: null, balance_after: null, reverses_id: '', ref_id: '', idempotency_key: key,
     entry_count: 0, created_by: memberId, created_at: nowIso_(), prev_hash: '', row_hash: ''
   };
-  var ents = [], lents = [], orig = null, cat, w, w2, jar, liab, asset;
+  var ents = [], lents = [], dents = [], orig = null, cat, w, w2, jar, liab, asset, debt;
 
   switch (k) {
     case 'income':
@@ -280,29 +323,78 @@ function planPost_(st, memberId, spec) {
       ents.push({ wallet_id: w.wallet_id, amount: k === 'asset_purchase' ? -t.amount : t.amount });
       break;
 
+    case 'debt_lend': case 'debt_borrow':
+      t.amount = amount_(spec.amount);
+      debt = st.debts[spec.debt_id];
+      if (!debt) throw ffErr_('DEBT', 'Khoản nợ cá nhân không tồn tại.');
+      if ((k === 'debt_lend' && debt.direction !== 'lend') || (k === 'debt_borrow' && debt.direction !== 'borrow')) throw ffErr_('DEBT', 'Chiều nợ không khớp.');
+      if (st.debtBal[debt.debt_id] !== 0) throw ffErr_('DEBT', 'Khoản nợ này đã ghi nhận số tiền ban đầu rồi.');
+      if (t.txn_date < debt.opening_date) throw ffErr_('DATE', 'Ngày không được trước ngày bắt đầu khoản nợ (' + debt.opening_date + ').');
+      w = activeWallet_(st, spec.wallet_id);
+      t.ref_id = debt.debt_id;
+      ents.push({ wallet_id: w.wallet_id, amount: k === 'debt_lend' ? -t.amount : t.amount });
+      dents.push({ debt_id: debt.debt_id, amount: t.amount });
+      break;
+
+    case 'debt_collect': case 'debt_repay':
+      t.amount = amount_(spec.amount);
+      debt = st.debts[spec.debt_id];
+      if (!debt) throw ffErr_('DEBT', 'Khoản nợ cá nhân không tồn tại.');
+      if ((k === 'debt_collect' && debt.direction !== 'lend') || (k === 'debt_repay' && debt.direction !== 'borrow')) throw ffErr_('DEBT', 'Chiều nợ không khớp.');
+      if (t.txn_date < debt.opening_date) throw ffErr_('DATE', 'Ngày không được trước ngày bắt đầu khoản nợ (' + debt.opening_date + ').');
+      w = activeWallet_(st, spec.wallet_id);
+      if (t.amount > st.debtBal[debt.debt_id]) throw ffErr_('DEBT', k === 'debt_collect' ? 'Số tiền thu vượt số dư còn được nợ.' : 'Số tiền trả vượt số dư còn nợ.');
+      t.ref_id = debt.debt_id;
+      ents.push({ wallet_id: w.wallet_id, amount: k === 'debt_collect' ? t.amount : -t.amount });
+      dents.push({ debt_id: debt.debt_id, amount: -t.amount });
+      break;
+
+    case 'debt_adjustment':
+      debt = st.debts[spec.debt_id];
+      if (!debt) throw ffErr_('DEBT', 'Khoản nợ cá nhân không tồn tại.');
+      if (t.txn_date < debt.opening_date) throw ffErr_('DATE', 'Ngày điều chỉnh không được trước ngày bắt đầu khoản nợ.');
+      t.reason = reqText_(spec.reason, 'Lý do điều chỉnh', 3, 300);
+      var actualDbt = signed_(spec.actual_balance, 'Số dư nợ thực tế');
+      if (actualDbt < 0) throw ffErr_('AMOUNT', 'Số dư nợ không được âm.');
+      var beforeDbt = st.debtBal[debt.debt_id];
+      var dDbt = actualDbt - beforeDbt;
+      if (dDbt === 0) throw ffErr_('ADJ0', 'Số dư nợ thực tế trùng hệ thống, không cần điều chỉnh.');
+      t.amount = Math.abs(dDbt); t.balance_before = beforeDbt; t.balance_after = actualDbt; t.ref_id = debt.debt_id;
+      dents.push({ debt_id: debt.debt_id, amount: dDbt });
+      break;
+
     case 'reversal':
       var o = st.txnMap[spec.txn_id];
       if (!o) throw ffErr_('REV', 'Không tìm thấy giao dịch cần đảo.');
       if (o.txn_kind === 'reversal') throw ffErr_('REV', 'Không thể đảo một bút toán đảo.');
       if (st.reversedBy[o.txn_id]) throw ffErr_('REV', 'Giao dịch này đã được đảo trước đó.');
+      // debt_lend/debt_borrow brings a Debt's balance from 0 up to its original amount; reversing
+      // it after later debt_collect/debt_repay/debt_adjustment activity would drive the balance
+      // negative (nothing pins it the way Liabilities' static opening_balance does), so block it
+      // and point to "Điều chỉnh nợ cá nhân" instead, same spirit as asset_sale blocking a 2nd sale.
+      if ((o.txn_kind === 'debt_lend' || o.txn_kind === 'debt_borrow') && st.debtBal[o.ref_id] !== o.amount) {
+        throw ffErr_('DEBT', 'Khoản nợ cá nhân này đã có phát sinh thu/trả hoặc điều chỉnh, không thể đảo bút toán tạo khoản nợ nữa. Hãy dùng "Điều chỉnh nợ cá nhân" để sửa số dư.');
+      }
       t.reason = reqText_(spec.reason, 'Lý do đảo', 3, 300);
-      orig = { txn: o, ents: st.entriesBy[o.txn_id] || [], lents: st.lentriesBy[o.txn_id] || [] };
+      orig = { txn: o, ents: st.entriesBy[o.txn_id] || [], lents: st.lentriesBy[o.txn_id] || [], dents: st.dentriesBy[o.txn_id] || [] };
       t.reverses_id = o.txn_id; t.amount = o.amount; t.txn_date = o.txn_date;
       t.category_id = o.category_id; t.jar_id = o.jar_id; t.ref_id = o.ref_id;
       t.paid_by = o.paid_by; t.beneficiary = o.beneficiary;
       orig.ents.forEach(function (e) { ents.push({ wallet_id: e.wallet_id, amount: -e.amount }); });
       orig.lents.forEach(function (e) { lents.push({ liability_id: e.liability_id, amount: -e.amount }); });
+      orig.dents.forEach(function (e) { dents.push({ debt_id: e.debt_id, amount: -e.amount }); });
       break;
   }
 
-  t.entry_count = ents.length + lents.length;
-  var issues = shapeIssues_(t, ents, lents, orig);
+  t.entry_count = ents.length + lents.length + dents.length;
+  var issues = shapeIssues_(t, ents, lents, dents, orig);
   if (issues.length) throw ffErr_('SHAPE', issues[0]);
 
   t.prev_hash = st.lastHash;
-  t.row_hash = hashOf_(t.prev_hash, t, ents, lents);
+  t.row_hash = hashOf_(t.prev_hash, t, ents, lents, dents);
   var eRows = ents.map(function (e, i) { return { entry_id: t.txn_id + '-' + (i + 1), txn_id: t.txn_id, wallet_id: e.wallet_id, amount: e.amount }; });
   var lRows = lents.map(function (e, i) { return { entry_id: t.txn_id + '-L' + (i + 1), txn_id: t.txn_id, liability_id: e.liability_id, amount: e.amount }; });
+  var dRows = dents.map(function (e, i) { return { entry_id: t.txn_id + '-D' + (i + 1), txn_id: t.txn_id, debt_id: e.debt_id, amount: e.amount }; });
 
   // update in-memory state for the next item of a batch
   st.lastHash = t.row_hash;
@@ -310,13 +402,14 @@ function planPost_(st, memberId, spec) {
   st.txnList.push(t);
   if (key) st.keyMap[key] = t.txn_id;
   if (t.reverses_id) st.reversedBy[t.reverses_id] = t.txn_id;
-  st.entriesBy[t.txn_id] = eRows; st.lentriesBy[t.txn_id] = lRows;
+  st.entriesBy[t.txn_id] = eRows; st.lentriesBy[t.txn_id] = lRows; st.dentriesBy[t.txn_id] = dRows;
   eRows.forEach(function (e) { applyEntryToState_(st, e, t); });
   lRows.forEach(function (e) { applyLentryToState_(st, e, t); });
+  dRows.forEach(function (e) { applyDentryToState_(st, e, t); });
   if (k === 'asset_sale') st.assetSale[t.ref_id] = t.txn_id;
   if (k === 'reversal' && orig.txn.txn_kind === 'asset_sale') delete st.assetSale[orig.txn.ref_id];
 
-  return { duplicate: false, txn_id: t.txn_id, plan: { txn: t, ents: eRows, lents: lRows } };
+  return { duplicate: false, txn_id: t.txn_id, plan: { txn: t, ents: eRows, lents: lRows, dents: dRows } };
 }
 
 // Ledger lines are written first and the transaction header last: a header exists
@@ -324,14 +417,16 @@ function planPost_(st, memberId, spec) {
 function commitPlans_(plans, chunk) {
   chunk = chunk || 400;
   for (var i = 0; i < plans.length; i += chunk) {
-    var part = plans.slice(i, i + chunk), E = [], L = [], T = [];
+    var part = plans.slice(i, i + chunk), E = [], L = [], D = [], T = [];
     part.forEach(function (p) {
       Array.prototype.push.apply(E, p.ents);
       Array.prototype.push.apply(L, p.lents);
+      Array.prototype.push.apply(D, p.dents);
       T.push(p.txn);
     });
     appendRows_('Entries', E);
     appendRows_('LiabilityEntries', L);
+    appendRows_('DebtEntries', D);
     appendRows_('Transactions', T);
   }
 }
@@ -359,6 +454,9 @@ function svcLoanPay_(m, p) { return postOne_(m, { kind: 'loan_payment', date: p.
 function svcLoanAdjust_(m, p) { return postOne_(m, { kind: 'liability_adjustment', date: p.date || todayYmd_(), liability_id: p.liability_id, actual_balance: p.actual_balance, reason: p.reason, note: p.note, key: p.key }); }
 function svcAssetBuy_(m, p) { return postOne_(m, { kind: 'asset_purchase', date: p.date, amount: p.amount, wallet_id: p.wallet_id, asset_id: p.asset_id, note: p.note, key: p.key }); }
 function svcAssetSell_(m, p) { return postOne_(m, { kind: 'asset_sale', date: p.date, amount: p.amount, wallet_id: p.wallet_id, asset_id: p.asset_id, note: p.note, key: p.key }); }
+function svcDebtCollect_(m, p) { return postOne_(m, { kind: 'debt_collect', date: p.date, amount: p.amount, wallet_id: p.wallet_id, debt_id: p.debt_id, note: p.note, key: p.key }); }
+function svcDebtRepay_(m, p) { return postOne_(m, { kind: 'debt_repay', date: p.date, amount: p.amount, wallet_id: p.wallet_id, debt_id: p.debt_id, note: p.note, key: p.key }); }
+function svcDebtAdjust_(m, p) { return postOne_(m, { kind: 'debt_adjustment', date: p.date || todayYmd_(), debt_id: p.debt_id, actual_balance: p.actual_balance, reason: p.reason, note: p.note, key: p.key }); }
 
 // ---------- Balances ----------
 function walletBalances_() {
@@ -373,11 +471,12 @@ function integrityScan_() {
   var issues = [];
   function add(code, ref, msg) { issues.push({ code: code, ref: ref || '', msg: msg }); }
   var txns = readAll_('Transactions');
-  var ents = readAll_('Entries'), lents = readAll_('LiabilityEntries');
-  var wallets = {}, liabs = {};
+  var ents = readAll_('Entries'), lents = readAll_('LiabilityEntries'), dents = readAll_('DebtEntries');
+  var wallets = {}, liabs = {}, debts = {};
   readAll_('Wallets').forEach(function (w) { wallets[w.wallet_id] = w; });
   readAll_('Liabilities').forEach(function (l) { liabs[l.liability_id] = l; });
-  var txMap = {}, entBy = {}, lentBy = {}, seenKeys = {}, reversedSeen = {};
+  readAll_('Debts').forEach(function (d) { debts[d.debt_id] = d; });
+  var txMap = {}, entBy = {}, lentBy = {}, dentBy = {}, seenKeys = {}, reversedSeen = {};
   txns.forEach(function (t) {
     if (txMap[t.txn_id]) add('dup_txn', t.txn_id, 'Trùng mã giao dịch.');
     txMap[t.txn_id] = t;
@@ -397,11 +496,18 @@ function integrityScan_() {
     if (!txMap[e.txn_id]) add('orphan_entry', e.entry_id, 'Dòng nợ không có giao dịch.');
     if (!liabs[e.liability_id]) add('unknown_liability', e.entry_id, 'Dòng nợ trỏ tới khoản vay không tồn tại.');
   });
+  dents.forEach(function (e) {
+    if (seenEntry[e.entry_id]) add('dup_entry', e.entry_id, 'Trùng mã dòng nợ cá nhân.');
+    seenEntry[e.entry_id] = true;
+    (dentBy[e.txn_id] = dentBy[e.txn_id] || []).push(e);
+    if (!txMap[e.txn_id]) add('orphan_entry', e.entry_id, 'Dòng nợ cá nhân không có giao dịch.');
+    if (!debts[e.debt_id]) add('unknown_debt', e.entry_id, 'Dòng nợ cá nhân trỏ tới khoản nợ không tồn tại.');
+  });
   var prev = 'GENESIS';
   txns.forEach(function (t) {
-    var te = entBy[t.txn_id] || [], tl = lentBy[t.txn_id] || [];
+    var te = entBy[t.txn_id] || [], tl = lentBy[t.txn_id] || [], td = dentBy[t.txn_id] || [];
     if (t.prev_hash !== prev) add('chain', t.txn_id, 'Chuỗi mã băm bị đứt tại giao dịch này.');
-    var expected = hashOf_(t.prev_hash, t, te, tl);
+    var expected = hashOf_(t.prev_hash, t, te, tl, td);
     if (t.row_hash !== expected) add('hash', t.txn_id, 'Nội dung giao dịch hoặc dòng sổ cái đã bị sửa.');
     prev = t.row_hash;
     if (t.idempotency_key) {
@@ -411,11 +517,11 @@ function integrityScan_() {
     var orig = null;
     if (t.txn_kind === 'reversal') {
       var o = txMap[t.reverses_id];
-      if (o) orig = { txn: o, ents: entBy[o.txn_id] || [], lents: lentBy[o.txn_id] || [] };
+      if (o) orig = { txn: o, ents: entBy[o.txn_id] || [], lents: lentBy[o.txn_id] || [], dents: dentBy[o.txn_id] || [] };
       if (reversedSeen[t.reverses_id]) add('double_reversal', t.txn_id, 'Giao dịch gốc bị đảo nhiều lần.');
       reversedSeen[t.reverses_id] = true;
     }
-    shapeIssues_(t, te, tl, orig).forEach(function (m) { add('shape', t.txn_id, m); });
+    shapeIssues_(t, te, tl, td, orig).forEach(function (m) { add('shape', t.txn_id, m); });
   });
-  return { ok: issues.length === 0, issues: issues, counts: { txns: txns.length, entries: ents.length, lentries: lents.length }, last_hash: prev };
+  return { ok: issues.length === 0, issues: issues, counts: { txns: txns.length, entries: ents.length, lentries: lents.length, dentries: dents.length }, last_hash: prev };
 }

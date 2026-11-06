@@ -9,6 +9,7 @@ function ffApi_() { return {
   txns: function (m, p) { return listTxns_(m, p); },
   budget: function (m, p) { return withLock_(function () { ensurePeriod_(m, p.period || currentPeriod_()); return budgetView_(m, p.period || currentPeriod_()); }); },
   assets: function (m, p) { return assetsView_(); },
+  debts: function (m, p) { return debtsView_(); },
   reminders: function (m, p) { return listReminders_(); },
   health: function (m, p) { return healthView_(); },
 
@@ -22,6 +23,10 @@ function ffApi_() { return {
   loanAdjust: svcLoanAdjust_,
   assetBuy: svcAssetBuy_,
   assetSell: svcAssetSell_,
+  debtNew: svcDebtNew_,
+  debtCollect: svcDebtCollect_,
+  debtRepay: svcDebtRepay_,
+  debtAdjust: svcDebtAdjust_,
 
   setBudget: setJarBudget_,
   moveBudget: moveBudget_,

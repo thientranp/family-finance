@@ -209,19 +209,19 @@ test_('Hoàn tiền giảm chi tiêu của lọ', function () {
 test_('Hình dạng giao dịch: bộ kiểm tra bắt các dữ liệu sai', function () {
   var base = { txn_id: 'T1', txn_date: T_D, amount: 100, category_id: '', jar_id: '', reason: '', balance_before: null, balance_after: null, reverses_id: '', ref_id: '', entry_count: 1 };
   function t(over) { return Object.assign({}, base, over); }
-  ok_(shapeIssues_(t({ txn_kind: 'income' }), [{ wallet_id: 'W1', amount: 100 }], [], null).length === 0, 'thu hợp lệ');
-  ok_(shapeIssues_(t({ txn_kind: 'income' }), [{ wallet_id: 'W1', amount: -100 }], [], null).length > 0, 'thu sai dấu');
-  ok_(shapeIssues_(t({ txn_kind: 'income' }), [], [], null).length > 0, 'thu thiếu dòng');
-  ok_(shapeIssues_(t({ txn_kind: 'expense', jar_id: '' }), [{ wallet_id: 'W1', amount: -100 }], [], null).length > 0, 'chi thiếu lọ');
-  ok_(shapeIssues_(t({ txn_kind: 'income', jar_id: 'J1' }), [{ wallet_id: 'W1', amount: 100 }], [], null).length > 0, 'thu gắn lọ');
-  ok_(shapeIssues_(t({ txn_kind: 'transfer', entry_count: 2 }), [{ wallet_id: 'W1', amount: -100 }, { wallet_id: 'W2', amount: 90 }], [], null).length > 0, 'chuyển lệch số tiền');
-  ok_(shapeIssues_(t({ txn_kind: 'transfer', entry_count: 2 }), [{ wallet_id: 'W1', amount: -100 }, { wallet_id: 'W1', amount: 100 }], [], null).length > 0, 'chuyển cùng ví');
-  ok_(shapeIssues_(t({ txn_kind: 'adjustment', reason: 'x', balance_before: 10, balance_after: 100 }), [{ wallet_id: 'W1', amount: 100 }], [], null).length > 0, 'điều chỉnh trước/sau lệch');
-  ok_(shapeIssues_(t({ txn_kind: 'adjustment', reason: '', balance_before: 0, balance_after: 100 }), [{ wallet_id: 'W1', amount: 100 }], [], null).length > 0, 'điều chỉnh thiếu lý do');
-  var orig = { txn: { txn_kind: 'expense', amount: 100 }, ents: [{ wallet_id: 'W1', amount: -100 }], lents: [] };
-  ok_(shapeIssues_(t({ txn_kind: 'reversal', reason: 'r', reverses_id: 'T0', jar_id: 'J1' }), [{ wallet_id: 'W1', amount: 100 }], [], orig).length === 0, 'đảo hợp lệ');
-  ok_(shapeIssues_(t({ txn_kind: 'reversal', reason: 'r', reverses_id: 'T0', jar_id: 'J1' }), [{ wallet_id: 'W1', amount: -100 }], [], orig).length > 0, 'đảo không đối xứng');
-  ok_(shapeIssues_(t({ txn_kind: 'reversal', reason: 'r', reverses_id: 'T0', jar_id: 'J1' }), [{ wallet_id: 'W2', amount: 100 }], [], orig).length > 0, 'đảo sai ví');
+  ok_(shapeIssues_(t({ txn_kind: 'income' }), [{ wallet_id: 'W1', amount: 100 }], [], [], null).length === 0, 'thu hợp lệ');
+  ok_(shapeIssues_(t({ txn_kind: 'income' }), [{ wallet_id: 'W1', amount: -100 }], [], [], null).length > 0, 'thu sai dấu');
+  ok_(shapeIssues_(t({ txn_kind: 'income' }), [], [], [], null).length > 0, 'thu thiếu dòng');
+  ok_(shapeIssues_(t({ txn_kind: 'expense', jar_id: '' }), [{ wallet_id: 'W1', amount: -100 }], [], [], null).length > 0, 'chi thiếu lọ');
+  ok_(shapeIssues_(t({ txn_kind: 'income', jar_id: 'J1' }), [{ wallet_id: 'W1', amount: 100 }], [], [], null).length > 0, 'thu gắn lọ');
+  ok_(shapeIssues_(t({ txn_kind: 'transfer', entry_count: 2 }), [{ wallet_id: 'W1', amount: -100 }, { wallet_id: 'W2', amount: 90 }], [], [], null).length > 0, 'chuyển lệch số tiền');
+  ok_(shapeIssues_(t({ txn_kind: 'transfer', entry_count: 2 }), [{ wallet_id: 'W1', amount: -100 }, { wallet_id: 'W1', amount: 100 }], [], [], null).length > 0, 'chuyển cùng ví');
+  ok_(shapeIssues_(t({ txn_kind: 'adjustment', reason: 'x', balance_before: 10, balance_after: 100 }), [{ wallet_id: 'W1', amount: 100 }], [], [], null).length > 0, 'điều chỉnh trước/sau lệch');
+  ok_(shapeIssues_(t({ txn_kind: 'adjustment', reason: '', balance_before: 0, balance_after: 100 }), [{ wallet_id: 'W1', amount: 100 }], [], [], null).length > 0, 'điều chỉnh thiếu lý do');
+  var orig = { txn: { txn_kind: 'expense', amount: 100 }, ents: [{ wallet_id: 'W1', amount: -100 }], lents: [], dents: [] };
+  ok_(shapeIssues_(t({ txn_kind: 'reversal', reason: 'r', reverses_id: 'T0', jar_id: 'J1' }), [{ wallet_id: 'W1', amount: 100 }], [], [], orig).length === 0, 'đảo hợp lệ');
+  ok_(shapeIssues_(t({ txn_kind: 'reversal', reason: 'r', reverses_id: 'T0', jar_id: 'J1' }), [{ wallet_id: 'W1', amount: -100 }], [], [], orig).length > 0, 'đảo không đối xứng');
+  ok_(shapeIssues_(t({ txn_kind: 'reversal', reason: 'r', reverses_id: 'T0', jar_id: 'J1' }), [{ wallet_id: 'W2', amount: 100 }], [], [], orig).length > 0, 'đảo sai ví');
 });
 
 test_('Xử lý theo lô: số dư cập nhật trong lô, một lần ghi, chuỗi băm đúng', function () {
@@ -266,6 +266,68 @@ test_('Khoản vay: trả nợ giảm dư nợ, không vượt dư nợ, điều
   eq_(bal_('W004'), w0, 'đảo trả lại ví');
   var view = assetsView_().liabilities.filter(function (x) { return x.liability_id === id; })[0];
   eq_(view.paid, 0, 'tổng đã trả sau đảo');
+});
+
+test_('Nợ cá nhân: cho vay/vay nợ trừ-cộng ví ngay, thu/trả nợ, điều chỉnh, đảo, tài sản ròng', function () {
+  var m = asUser_(T_EMAIL_1);
+  var nw0 = netWorth_();
+
+  // Cho vay: trừ ví ngay, không tính chi tiêu, cộng vào tài sản ròng (khoản phải thu).
+  var f0 = flow_('2026-11');
+  var w0 = bal_('W001');
+  var lend = svcDebtNew_(m, { direction: 'lend', date: T_D, amount: 2000000, wallet_id: 'W001', counterparty: 'Anh Tuấn', note: 'Cho mượn' });
+  var lendId = lend.debt_id;
+  eq_(bal_('W001'), w0 - 2000000, 'ví giảm khi cho vay');
+  eq_(flow_('2026-11').expense, f0.expense, 'cho vay không phải chi tiêu');
+  eq_(debtsView_().debts.filter(function (d) { return d.debt_id === lendId; })[0].balance, 2000000, 'số dư cho vay đúng');
+  eq_(netWorth_().net_worth, nw0.net_worth, 'cho vay: tiền chuyển dạng (ví giảm, phải thu tăng), tài sản ròng không đổi');
+  eq_(netWorth_().receivables, 2000000, 'phải thu tăng đúng số tiền cho vay');
+
+  // Thu nợ một phần, không được thu vượt số dư.
+  postOne_(m, { kind: 'debt_collect', date: T_D, amount: 500000, wallet_id: 'W001', debt_id: lendId });
+  eq_(bal_('W001'), w0 - 2000000 + 500000, 'ví tăng khi thu nợ');
+  eq_(debtsView_().debts.filter(function (d) { return d.debt_id === lendId; })[0].balance, 1500000, 'số dư cho vay giảm sau khi thu');
+  eq_(flow_('2026-11').income, flow_('2026-11').income, 'thu nợ không tính thu nhập (so sánh nội bộ)');
+  throws_(function () { postOne_(m, { kind: 'debt_collect', date: T_D, amount: 1500001, wallet_id: 'W001', debt_id: lendId }); }, 'DEBT', 'thu vượt số dư');
+  throws_(function () { postOne_(m, { kind: 'debt_repay', date: T_D, amount: 1000, wallet_id: 'W001', debt_id: lendId }); }, 'DEBT', 'không trả được khoản đang cho vay');
+
+  // Vay nợ: cộng ví ngay, không tính thu nhập, trừ vào tài sản ròng (gộp vào "Nợ").
+  var finc0 = flow_('2026-11').income;
+  var w1 = bal_('W002');
+  var nwBeforeBorrow = netWorth_();
+  var borrow = svcDebtNew_(m, { direction: 'borrow', date: T_D, amount: 3000000, wallet_id: 'W002', counterparty: 'Chị Lan' });
+  var borrowId = borrow.debt_id;
+  eq_(bal_('W002'), w1 + 3000000, 'ví tăng khi vay nợ');
+  eq_(flow_('2026-11').income, finc0, 'vay nợ không phải thu nhập');
+  eq_(netWorth_().net_worth, nwBeforeBorrow.net_worth, 'vay nợ: ví tăng, nợ phải trả tăng, tài sản ròng không đổi');
+  eq_(netWorth_().liabilities, nwBeforeBorrow.liabilities + 3000000, 'nợ phải trả tăng đúng số tiền vay');
+
+  // Trả nợ cá nhân một phần.
+  var w2 = bal_('W002');
+  postOne_(m, { kind: 'debt_repay', date: T_D, amount: 1000000, wallet_id: 'W002', debt_id: borrowId });
+  eq_(bal_('W002'), w2 - 1000000, 'ví giảm khi trả nợ cá nhân');
+  eq_(debtsView_().debts.filter(function (d) { return d.debt_id === borrowId; })[0].balance, 2000000, 'số dư vay nợ giảm sau khi trả');
+  throws_(function () { postOne_(m, { kind: 'debt_repay', date: T_D, amount: 2000001, wallet_id: 'W002', debt_id: borrowId }); }, 'DEBT', 'trả vượt số dư');
+  throws_(function () { postOne_(m, { kind: 'debt_collect', date: T_D, amount: 1000, wallet_id: 'W002', debt_id: borrowId }); }, 'DEBT', 'không thu được khoản đang vay nợ');
+
+  // Điều chỉnh nợ cá nhân (đối soát).
+  postOne_(m, { kind: 'debt_adjustment', date: T_D, debt_id: borrowId, actual_balance: 2200000, reason: 'Bạn nhắc còn nợ nhiều hơn' });
+  eq_(debtsView_().debts.filter(function (d) { return d.debt_id === borrowId; })[0].balance, 2200000, 'điều chỉnh áp dụng đúng');
+  throws_(function () { postOne_(m, { kind: 'debt_adjustment', date: T_D, debt_id: borrowId, actual_balance: 2200000, reason: 'không đổi' }); }, 'ADJ0', 'không chênh lệch');
+
+  // Đảo bút toán tạo khoản nợ CHƯA có phát sinh gì thì đảo được, trả lại cả ví lẫn số dư nợ về 0.
+  var w3 = bal_('W002');
+  var smallLend = svcDebtNew_(m, { direction: 'lend', date: T_D, amount: 400000, wallet_id: 'W002', counterparty: 'Em Hoa' });
+  postOne_(m, { kind: 'reversal', date: T_D, txn_id: smallLend.txn_id, reason: 'Ghi nhầm khoản cho vay' });
+  eq_(bal_('W002'), w3, 'đảo cho vay (chưa phát sinh gì) trả lại ví');
+  eq_(debtsView_().debts.filter(function (d) { return d.debt_id === smallLend.debt_id; })[0].balance, 0, 'đảo khoản chưa phát sinh gì: số dư về đúng 0');
+
+  // Nhưng đảo bút toán tạo khoản nợ SAU KHI đã có thu/trả/điều chỉnh thì bị chặn (tránh số dư âm vô lý).
+  var lendTxn = readAll_('Transactions').filter(function (t) { return t.txn_kind === 'debt_lend' && t.ref_id === lendId; })[0];
+  throws_(function () { postOne_(m, { kind: 'reversal', date: T_D, txn_id: lendTxn.txn_id, reason: 'Ghi nhầm khoản cho vay' }); }, 'DEBT', 'không đảo được khoản đã phát sinh thu nợ');
+
+  // Chiều nợ không khớp bị từ chối ngay từ bước tạo.
+  throws_(function () { postOne_(m, { kind: 'debt_lend', date: T_D, amount: 1000, wallet_id: 'W001', debt_id: borrowId }); }, 'DEBT', 'debt_lend trên khoản borrow');
 });
 
 test_('Tài sản, tài sản ròng và tiền giữ hộ', function () {

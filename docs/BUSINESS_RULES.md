@@ -28,6 +28,15 @@ Trạng thái: **ĐÃ DUYỆT** = bạn đã xác nhận; **GIẢ ĐỊNH** = t�
 - Tiết kiệm = ví loại `savings`; chuyển vào/ra là chuyển ví. [ĐÃ DUYỆT]
 - Ví chỉ đóng được khi số dư = 0. Ví giữ hộ cần tên người gửi.
 
+## Nợ cá nhân (vay mượn người quen, khác "Khoản vay" ngân hàng) — quyết định 06/11/2026
+- Theo dõi **cả 2 chiều**: cho vay (`lend`, người khác nợ gia đình) và vay nợ (`borrow`, gia đình nợ người khác). [ĐÃ DUYỆT]
+- **Không tính lãi suất** — chỉ theo dõi gốc và đã trả/thu bao nhiêu, còn lại bao nhiêu. [ĐÃ DUYỆT]
+- Tạo khoản nợ mới (`debt_lend`/`debt_borrow`) là MỘT bước vừa ghi nhận khoản nợ vừa di chuyển tiền ví ngay: cho vay → trừ ví; vay nợ → cộng ví. Không tính vào thu/chi. [ĐÃ DUYỆT]
+- Thu nợ (`debt_collect`, chỉ áp dụng khoản `lend`) → cộng ví, giảm số dư còn được nợ; không tính thu nhập. Trả nợ cá nhân (`debt_repay`, chỉ áp dụng khoản `borrow`) → trừ ví, giảm số dư còn nợ; không tính chi tiêu. Không được thu/trả vượt số dư hiện tại. [ĐÃ DUYỆT]
+- Điều chỉnh nợ cá nhân (`debt_adjustment`): giống điều chỉnh dư nợ ngân hàng, lý do bắt buộc, lưu số dư trước/sau. [GIẢ ĐỊNH, theo mẫu Khoản vay hiện có]
+- **Tài sản ròng**: khoản cho vay còn lại cộng vào tài sản ròng (giống một khoản phải thu); khoản vay nợ còn lại trừ vào tài sản ròng (gộp chung với dư nợ ngân hàng trong mục "Nợ"). [GIẢ ĐỊNH — mặc định kế toán thông thường, chưa hỏi riêng người dùng, có thể điều chỉnh nếu không đúng ý]
+- Dữ liệu lịch sử: 43 dòng "Chi &gt; Cho vay" (1,75tr) và 22 dòng "Thu &gt; Mượn tiền" (16,74tr) trong Excel cũ, trước đây bị bỏ qua lúc nhập liệu, sẽ được đưa vào thành các khoản nợ cá nhân (theo quyết định 06/11/2026). Chưa rõ khoản nào đã trả hết — sẽ đánh dấu rõ để người dùng tự rà soát, không tự ý coi là đã tất toán. [ĐÃ DUYỆT hướng làm, CHƯA THỰC HIỆN]
+
 ## Ngân sách
 - Theo tháng, số tiền cố định theo lọ; tháng mới sao chép từ tháng gần nhất trước đó. [ĐÃ DUYỆT]
 - Chỉ sửa được tháng hiện tại và tương lai; tháng đã qua giữ nguyên. Mọi thay đổi có nhật ký.

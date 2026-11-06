@@ -34,14 +34,16 @@ function listTxns_(m, f) {
   f = f || {};
   var txns = readAll_('Transactions');
   var tmap = txnMap_(txns);
-  var ents = readAll_('Entries'), lents = readAll_('LiabilityEntries');
-  var entBy = {}, lentBy = {}, reversedBy = {};
+  var ents = readAll_('Entries'), lents = readAll_('LiabilityEntries'), dents = readAll_('DebtEntries');
+  var entBy = {}, lentBy = {}, dentBy = {}, reversedBy = {};
   ents.forEach(function (e) { (entBy[e.txn_id] = entBy[e.txn_id] || []).push(e); });
   lents.forEach(function (e) { (lentBy[e.txn_id] = lentBy[e.txn_id] || []).push(e); });
+  dents.forEach(function (e) { (dentBy[e.txn_id] = dentBy[e.txn_id] || []).push(e); });
   txns.forEach(function (t) { if (t.reverses_id) reversedBy[t.reverses_id] = t.txn_id; });
   var wn = nameMap_('Wallets', 'wallet_id', 'name'), jn = nameMap_('Jars', 'jar_id', 'name'),
     cn = nameMap_('Categories', 'category_id', 'name'), mn = nameMap_('Members', 'member_id', 'display_name'),
-    ln = nameMap_('Liabilities', 'liability_id', 'name'), an = nameMap_('Assets', 'asset_id', 'name');
+    ln = nameMap_('Liabilities', 'liability_id', 'name'), an = nameMap_('Assets', 'asset_id', 'name'),
+    dn = nameMap_('Debts', 'debt_id', 'counterparty');
   mn.FAMILY = 'Cả gia đình';
   var q = f.q ? String(f.q).toLowerCase() : '';
   var out = [];
@@ -55,9 +57,10 @@ function listTxns_(m, f) {
     out.push({
       txn_id: t.txn_id, date: t.txn_date, kind: t.txn_kind, kind_label: FF_KINDS[t.txn_kind] || t.txn_kind, amount: t.amount,
       lines: te.map(function (e) { return { wallet_id: e.wallet_id, wallet: wn[e.wallet_id] || e.wallet_id, amount: e.amount }; }),
-      debt_lines: (lentBy[t.txn_id] || []).map(function (e) { return { liability: ln[e.liability_id] || e.liability_id, amount: e.amount }; }),
+      debt_lines: (lentBy[t.txn_id] || []).map(function (e) { return { liability: ln[e.liability_id] || e.liability_id, amount: e.amount }; })
+        .concat((dentBy[t.txn_id] || []).map(function (e) { return { liability: dn[e.debt_id] || e.debt_id, amount: e.amount }; })),
       jar: jn[t.jar_id] || '', category: cn[t.category_id] || '', paid_by: mn[t.paid_by] || '', beneficiary: mn[t.beneficiary] || '',
-      ref: ln[t.ref_id] || an[t.ref_id] || '', note: t.note, reason: t.reason, balance_before: t.balance_before, balance_after: t.balance_after,
+      ref: ln[t.ref_id] || an[t.ref_id] || dn[t.ref_id] || '', note: t.note, reason: t.reason, balance_before: t.balance_before, balance_after: t.balance_after,
       reverses_id: t.reverses_id, reversed: !!reversedBy[t.txn_id],
       reversible: t.txn_kind !== 'reversal' && !reversedBy[t.txn_id],
       created_by: mn[t.created_by] || '', created_at: t.created_at
@@ -101,7 +104,7 @@ function dashboard_(m, period) {
   var recent = listTxns_(m, { limit: 8 }).rows;
   return {
     period: period,
-    cash_available: nw.cash, savings: nw.savings, assets: nw.assets, liabilities: nw.liabilities, held_in_trust: nw.held_in_trust, net_worth: nw.net_worth,
+    cash_available: nw.cash, savings: nw.savings, assets: nw.assets, receivables: nw.receivables, liabilities: nw.liabilities, held_in_trust: nw.held_in_trust, net_worth: nw.net_worth,
     flow: flow, budget: budget, wallets: wallets, alerts: alerts, recent: recent,
     health: { last_integrity: getSetting_('last_integrity', ''), last_backup_weekly: getSetting_('last_backup_weekly', ''), last_backup_monthly: getSetting_('last_backup_monthly', '') }
   };

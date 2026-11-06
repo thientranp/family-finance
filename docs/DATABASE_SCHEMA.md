@@ -136,6 +136,28 @@ Dòng sổ cái theo khoản vay (dấu − = giảm dư nợ).
 | liability_id | t |
 | amount | n |
 
+## Debts
+Sổ nợ cá nhân (vay mượn người quen) — khác `Liabilities` (nợ ngân hàng). Không có cột số dư: số dư còn nợ luôn tính từ `DebtEntries`, bắt đầu từ 0 (xem Ledger bên dưới).
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| debt_id | t | |
+| direction | t | `lend` (gia đình cho vay) \| `borrow` (gia đình vay nợ) |
+| counterparty | t | tên người vay/cho vay (chữ tự do, không bắt buộc là thành viên trong Members) |
+| original_amount | n | số tiền gốc ban đầu, không đổi |
+| opening_date | t | ngày phát sinh khoản nợ |
+| note | t | |
+
+## DebtEntries
+Dòng sổ cái theo khoản nợ cá nhân (dấu + = số dư còn nợ tăng, dấu − = giảm). Bút toán tạo khoản nợ (`debt_lend`/`debt_borrow`) đưa số dư từ 0 lên `original_amount`; nhờ vậy đảo bút toán tạo khoản nợ cũng tự đưa số dư về 0 đúng, không cần một `opening_balance` tĩnh như `Liabilities`.
+
+| Cột | Kiểu |
+|---|---|
+| entry_id | t |
+| txn_id | t |
+| debt_id | t |
+| amount | n |
+
 ## Reminders
 
 | Cột | Kiểu |

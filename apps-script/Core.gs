@@ -21,6 +21,10 @@ var FF_SCHEMA = {
   Assets: 'asset_id:t,asset_type:t,name:t,purchase_value:n,purchase_date:t,note:t,active:n',
   Liabilities: 'liability_id:t,name:t,original_amount:n,opening_balance:n,opening_date:t,status:t',
   LiabilityEntries: 'entry_id:t,txn_id:t,liability_id:t,amount:n',
+  // direction: 'lend' (gia đình cho người khác vay, người đó nợ gia đình) | 'borrow' (gia đình vay của người khác).
+  // Không có cột số dư/opening_balance ở đây: số dư còn nợ luôn tính từ DebtEntries (bắt đầu từ 0, bắt đầu nợ thì đi kèm bút toán debt_lend/debt_borrow) để tránh ghi trùng và để đảo được bút toán một cách nhất quán.
+  Debts: 'debt_id:t,direction:t,counterparty:t,original_amount:n,opening_date:t,note:t',
+  DebtEntries: 'entry_id:t,txn_id:t,debt_id:t,amount:n',
   Reminders: 'reminder_id:t,type:t,title:t,day_of_month:n,days_before:n,ref_id:t,active:n',
   Notifications: 'key:t,created_at:t,to:t,subject:t,status:t,attempts:n,last_error:t',
   AuditLog: 'ts:t,actor:t,action:t,ref_id:t,details:t',
@@ -28,7 +32,7 @@ var FF_SCHEMA = {
 };
 
 // Sheets that make up the immutable ledger (watched for manual edits).
-var FF_LEDGER_SHEETS = ['Transactions', 'Entries', 'LiabilityEntries', 'AuditLog'];
+var FF_LEDGER_SHEETS = ['Transactions', 'Entries', 'LiabilityEntries', 'DebtEntries', 'AuditLog'];
 
 var FF_DEFAULT_SETTINGS = {
   env: 'DATA',
