@@ -2,7 +2,7 @@
 var FF_V = FF_V || {};
 FF_V.Reports = '0.3.0';
 
-function vnd_(n) { var neg = n < 0; return (neg ? '-' : '') + String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' ₫'; }
+function vnd_(n) { var neg = n < 0; return (neg ? '-' : '') + String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' ₫'; }
 
 function nameMap_(sheet, idCol, nameCol) {
   var m = {};
