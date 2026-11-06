@@ -11,6 +11,8 @@ coverage/
 !.env.example
 *.pem
 *.key
+.clasp.json
+.clasprc.json
 
 # Financial data and exports (never commit)
 *.xlsx
