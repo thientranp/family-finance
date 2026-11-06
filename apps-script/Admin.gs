@@ -13,7 +13,7 @@ var FF_SEED_CATEGORIES = [
   ['Du lịch', 5], ['Làm đẹp', 5], ['Mỹ phẩm', 5], ['Giải trí', 5], ['Thể thao', 5], ['Điện thoại', 5], ['Netflix', 5],
   ['Lì xì', 6], ['Đi đám', 6], ['Đồ cúng', 6], ['Từ thiện', 6], ['Cưới hỏi', 6], ['Bạn bè', 6], ['BIH', 6], ['EIU', 6]
 ];
-var FF_SEED_INCOME = ['Lương', 'Thu nhập chung (Vending, Coin)', 'Lãi tiết kiệm', 'Thu khác'];
+var FF_SEED_INCOME = ['Lương', 'Thưởng', 'Đầu tư', 'Lãi tiết kiệm', 'Thu khác'];
 
 // Wallet list from the approved specification (section 3). Opening balances are entered later by the user.
 var FF_SEED_WALLETS = [
