@@ -202,14 +202,13 @@ var FF_IMPORT_ROW_OVERRIDES = {
   '8289cbd7': { action: 'expense', target: 'Phí ngân hàng & thẻ' },               // không ghi chú, 14.520
   'a16ec2b8': { action: 'expense', target: 'Đối soát cũ (lịch sử) - thiếu hụt' }, // ghi chú gốc "điều chỉnh"
   '9a20f8f4': { action: 'expense', target: 'Đối soát cũ (lịch sử) - thiếu hụt' }, // ghi chú gốc "điều chỉnh"
-  // 6 dòng còn lại trong "Chi phí" có bản chất thật sự không rõ (vàng / "Card Đt" có thể là nạp thẻ
-  // điện thoại thay vì phí ngân hàng / tặng tiền cá nhân) — để 'review', bạn tự quyết trong ImportMap.
-  'e11hq92j': { action: 'review' },  // "Bỏ vô tiền vàng cho đủ 2.5 củ" — liên quan vàng, không phải phí
-  '588de776': { action: 'review' },  // "Card Đt" — phí ngân hàng hay nạp thẻ điện thoại?
-  'e73505ef': { action: 'review' },  // "Card Đt"
-  'b31412c6': { action: 'review' },  // "Card Đt"
-  '162d640a': { action: 'review' },  // "Card Đt"
-  'c887a440': { action: 'review' }   // "Anh Thiện Típ" — có vẻ là tặng/cho tiền cá nhân
+  // 6 dòng còn lại: đã hỏi và được xác nhận trực tiếp (07/11/2026) — tất cả bỏ qua.
+  'e11hq92j': { action: 'skip' },  // "Bỏ vô tiền vàng cho đủ 2.5 củ" — xác nhận: bỏ qua
+  '588de776': { action: 'skip' },  // "Card Đt" — xác nhận: nạp tiền điện thoại, bỏ qua
+  'e73505ef': { action: 'skip' },  // "Card Đt" — nt
+  'b31412c6': { action: 'skip' },  // "Card Đt" — nt
+  '162d640a': { action: 'skip' },  // "Card Đt" — nt
+  'c887a440': { action: 'skip' }   // "Anh Thiện Típ" — xác nhận: bỏ qua
 };
 
 // Writes/refreshes ImportMap. Existing decisions (already in the sheet) are kept; new groups fall

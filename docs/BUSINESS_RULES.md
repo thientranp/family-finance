@@ -53,11 +53,11 @@ Bổ sung/ghi đè một phần quyết định 06/11/2026 trong `DATA_MIGRATION
   3. **Trả góp**: 23 kỳ theo `oto.xlsx` (28/01/2025 → 25/10/2026, tổng đã trả 138.752.623đ, dư nợ còn lại 271.247.377đ tính đến kỳ cuối) → nhập là **trả nợ vay** (`loan_payment`) cho Khoản vay "Vay mua xe Cx3". 4 kỳ đầu (01–04/2025) lấy đúng ví đã ghi trong `finance`; **19 kỳ sau (05/2025–10/2026) không có trong `finance`, trước đây chưa từng được ghi sổ** — theo xác nhận của người dùng, tất cả trừ từ ví **Vietinbank - Cục Thịt**.
   4. 5 dòng lặt vặt còn lại trong `finance` (vá lốp, bơm điện, gối dựa, bảng số điện thoại, rửa xe, tổng ~1.087.926đ): **chi tiêu** thường, danh mục "Xe và di chuyển". [ĐÃ DUYỆT 07/11/2026]
 - **Chi phí** (40 dòng, 3,74tr) + **Phí thẻ** (5 dòng, 335.293đ): là một rổ tạp, tách theo nội dung ghi chú từng dòng —
-  - Phí ngân hàng/thẻ (phí thường niên, phí rút tiền, phí chuyển đổi, phí hoàn tiền, phí thẻ...) → danh mục mới **"Phí ngân hàng & thẻ"**.
+  - Phí ngân hàng/thẻ (phí thường niên, phí rút tiền, phí chuyển đổi, phí hoàn tiền, phí thẻ, và các dòng không ghi chú nhưng số tiền nhỏ lặp lại đúng mẫu phí định kỳ — 11.000/14.520/66.000đ trên cùng ví) → danh mục mới **"Phí ngân hàng & thẻ"**.
   - Phí hành chính/giấy tờ (chụp ảnh thẻ, hộ chiếu, công chứng, khai sinh, sổ đỏ) → danh mục mới **"Phí hành chính - giấy tờ"**.
   - Phí liên quan xe (cầu đường, vetc, sửa xe thuê) → gộp vào danh mục **"Xe và di chuyển"** có sẵn.
-  - 2 dòng tự ghi chú "điều chỉnh" (363.000đ + 95.000đ) → nhập bằng nghiệp vụ đối soát số dư (`adjustment`), không phải chi tiêu.
-  - 1 dòng mua vàng (34.000đ, "Bỏ vô tiền vàng cho đủ 2.5 củ") → tạm để chi tiêu thường (danh mục "Cá nhân và vui chơi"), sẽ xem lại khi làm tính năng Vàng. [ĐÃ DUYỆT 07/11/2026]
+  - 2 dòng tự ghi chú "điều chỉnh" (363.000đ + 95.000đ) → **không dùng `adjustment`** (chặn ngày trước opening_date của ví, xem mục trên) — nhập như chi tiêu lịch sử bình thường vào danh mục mới "Đối soát cũ (lịch sử) - thiếu hụt", cùng cách xử lý với nhóm "Điều chỉnh" chính.
+  - 6 dòng còn lại, bản chất không rõ ràng — đã hỏi trực tiếp người dùng và được xác nhận (07/11/2026): **bỏ qua (skip)**, không đưa vào hệ thống. Gồm: 1 dòng mua vàng (34.000đ, "Bỏ vô tiền vàng cho đủ 2.5 củ"), 4 dòng ghi chú "Card Đt" (126.000đ, xác nhận là nạp tiền điện thoại — không liên quan phí ngân hàng), 1 dòng "Anh Thiện Típ" (8.000đ, tiền tặng cá nhân). [ĐÃ DUYỆT 07/11/2026]
 - **Thuê xe** (3 dòng, 4,68tr): chi tiêu thường, danh mục "Xe và di chuyển". [ĐÃ DUYỆT 07/11/2026]
 - **Vending**: Chi 1 dòng (20tr, "máy bán nước") = mua máy → **mua tài sản**, Tài sản "Máy bán nước tự động" (loại Khác). Thu 11 dòng (20,52tr, tiền xu/doanh thu hằng tháng) = thu nhập vận hành → danh mục thu nhập mới "Thu nhập Vending" (giữ nguyên như quyết định 06/11/2026, không đổi). [ĐÃ DUYỆT 07/11/2026]
 
