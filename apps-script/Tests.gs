@@ -578,6 +578,23 @@ test_('Giao diện dựng được dữ liệu cho màn hình', function () {
   var byWallet = listTxns_(m, { wallet_id: 'W001', limit: 300 });
   ok_(byWallet.rows.every(function (r) { return r.lines.some(function (x) { return x.wallet_id === 'W001'; }); }), 'lọc theo ví');
   eq_(JSON.parse(JSON.stringify(d)).net_worth, d.net_worth, 'dữ liệu serialize được');
+  ok_(Array.isArray(d.debts_open), 'dashboard có sổ nợ cá nhân chưa xong');
+});
+
+test_('Lịch sử: lọc theo khoảng ngày, danh mục, khoảng tiền', function () {
+  var m = asUser_(T_EMAIL_1);
+  var cats = readAll_('Categories');
+  var cat = cats.filter(function (c) { return c.name === 'Xăng dầu'; })[0];
+  exp_(m, 'W001', 50000, 'J3', { category_id: cat.category_id, date: '2026-11-01' });
+  exp_(m, 'W001', 5000000, 'J3', { category_id: cat.category_id, date: '2026-11-03' });
+  var byRange = listTxns_(m, { date_from: '2026-11-02', date_to: '2026-11-04', limit: 300 });
+  ok_(byRange.rows.every(function (r) { return r.date >= '2026-11-02' && r.date <= '2026-11-04'; }), 'lọc theo khoảng ngày');
+  var byCat = listTxns_(m, { category_id: cat.category_id, limit: 300 });
+  ok_(byCat.rows.length >= 2 && byCat.rows.every(function (r) { return r.category === 'Xăng dầu'; }), 'lọc theo danh mục');
+  var byAmt = listTxns_(m, { amount_min: 1000000, limit: 300 });
+  ok_(byAmt.rows.length > 0 && byAmt.rows.every(function (r) { return r.amount >= 1000000; }), 'lọc theo số tiền tối thiểu');
+  var byAmtMax = listTxns_(m, { amount_max: 100000, limit: 300 });
+  ok_(byAmtMax.rows.every(function (r) { return r.amount <= 100000; }), 'lọc theo số tiền tối đa');
 });
 
 // Destructive tests (tamper with the sheets by hand) run last, each in its own environment.

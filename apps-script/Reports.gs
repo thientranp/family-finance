@@ -47,10 +47,18 @@ function listTxns_(m, f) {
   mn.FAMILY = 'Cả gia đình';
   var q = f.q ? String(f.q).toLowerCase() : '';
   var out = [];
+  // A custom date range (từ ngày-đến ngày) overrides the month picker; without one, fall back
+  // to the usual period (month) filter.
   txns.forEach(function (t) {
-    if (f.period && periodOf_(t.txn_date) !== f.period) return;
+    if (f.date_from || f.date_to) {
+      if (f.date_from && t.txn_date < f.date_from) return;
+      if (f.date_to && t.txn_date > f.date_to) return;
+    } else if (f.period && periodOf_(t.txn_date) !== f.period) return;
     if (f.kind && t.txn_kind !== f.kind) return;
     if (f.jar_id && t.jar_id !== f.jar_id) return;
+    if (f.category_id && t.category_id !== f.category_id) return;
+    if (f.amount_min && t.amount < Number(f.amount_min)) return;
+    if (f.amount_max && t.amount > Number(f.amount_max)) return;
     var te = entBy[t.txn_id] || [];
     if (f.wallet_id && !te.some(function (e) { return e.wallet_id === f.wallet_id; })) return;
     if (q && (t.note + ' ' + t.reason).toLowerCase().indexOf(q) < 0) return;
@@ -102,10 +110,13 @@ function dashboard_(m, period) {
     else if (j.status === 'warn') alerts.push({ level: 'warn', text: 'Lọ "' + j.name + '" đã dùng ' + j.pct + '% ngân sách' });
   });
   var recent = listTxns_(m, { limit: 8 }).rows;
+  // Sổ nợ cá nhân chưa thanh toán xong, hiện thẳng trên Tổng quan thay vì phải vào Thêm mới thấy.
+  var debtsOpen = debtsView_().debts.filter(function (d) { return d.status === 'active'; })
+    .sort(function (a, b) { return b.balance - a.balance; }).slice(0, 6);
   return {
     period: period,
     cash_available: nw.cash, savings: nw.savings, assets: nw.assets, receivables: nw.receivables, liabilities: nw.liabilities, held_in_trust: nw.held_in_trust, net_worth: nw.net_worth,
-    flow: flow, budget: budget, wallets: wallets, alerts: alerts, recent: recent,
+    flow: flow, budget: budget, wallets: wallets, alerts: alerts, recent: recent, debts_open: debtsOpen,
     health: { last_integrity: getSetting_('last_integrity', ''), last_backup_weekly: getSetting_('last_backup_weekly', ''), last_backup_monthly: getSetting_('last_backup_monthly', '') }
   };
 }
