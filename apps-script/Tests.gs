@@ -597,6 +597,60 @@ test_('Dữ liệu nền theo đặc tả', function () {
   eq_(getSetting_('cutoff_date'), '2026-11-01', 'ngày cắt');
 });
 
+
+test_('Nhập Excel cũ: ImportMap bắt buộc quyết định, chống trùng, đối chiếu khớp', function () {
+  var m = asUser_(T_EMAIL_1);
+  var src = SpreadsheetApp.create('SRC_TEST');
+  var fin = src.insertSheet('finance'), chg = src.insertSheet('change');
+  fin.getRange(1, 1, 1, 9).setValues([['ID', 'Ngày', 'Sự kiện', 'Loại', 'Mục', 'Số tiền', 'Ví', 'Sở hữu', 'Ghi chú']]);
+  var frows = [
+    ['a1', '2024-05-01', 'e', 'Chi', 'Đi chợ', 100000, 'VÍ - Cục Cá', 'Cục Cá', 'chợ'],
+    ['a2', '2024-05-02', 'e', 'Chi', 'Siêu Thị', 250000, 'Ví - Cục Thịt', 'Cục Thịt', ''],
+    ['a3', '2024-05-03', 'e', 'Thu', 'Lương', 9000000, 'BIDV - Cục Thịt', 'Cục Thịt', ''],
+    ['a4', '2024-05-04', 'e', 'Chi', 'CT tower', 500000000, 'HSBC', 'Cục Thịt', 'cần quyết định'],
+    ['a5', '2024-05-05', 'e', 'Chi', 'Điều chỉnh', 7000, 'Ví - Cục Cá', 'Cục Cá', '']
+  ];
+  fin.getRange(2, 1, frows.length, 9).setValues(frows);
+  chg.getRange(1, 1, 1, 5).setValues([['ID', 'Ngày', 'Số tiền', 'Từ', 'Đến']]);
+  chg.getRange(2, 1, 2, 5).setValues([['c1', '2024-05-06', 3000000, 'BIDV - Cục Thịt', 'VÍ - Cục Cá'], ['c2', '2024-05-07', 1000, 'HSBC', 'Ví khong co']]);
+  readAll_('Wallets').forEach(function (w) { updateRow_('Wallets', w._row, { opening_date: '2026-11-01' }); });
+  FF_CTX.importSrc = src.getId();
+  importPrepare();
+  var sh = getSs_().getSheetByName('ImportMap'), vals = sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues();
+  function actionOf(k, c) { return vals.filter(function (v) { return v[0] === k && v[1] === c; })[0][4]; }
+  eq_(actionOf('Chi', 'Đi chợ'), 'expense', 'đề xuất khớp tên');
+  eq_(actionOf('Chi', 'Siêu Thị'), 'expense', 'khớp không phân biệt hoa thường');
+  eq_(actionOf('Chi', 'CT tower'), 'review', 'chưa quyết định');
+  eq_(actionOf('Thu', 'Lương'), 'income', 'thu Lương');
+  throws_(function () { importRun(); }, 'IMPORT', 'bị chặn khi còn review');
+  eq_(readAll_('Transactions').length, 0, 'chưa ghi gì');
+  // người dùng quyết định
+  function setAction(k, c, a, tgt) { for (var i = 0; i < vals.length; i++) if (vals[i][0] === k && vals[i][1] === c) sh.getRange(i + 2, 5, 1, 2).setValues([[a, tgt || vals[i][5]]]); }
+  setAction('Chi', 'CT tower', 'skip'); setAction('Chi', 'Điều chỉnh', 'skip');
+  var dry = importDryRun();
+  ok_(/Ví chuyển không nhận diện được/.test(dry), 'báo ví lạ');
+  throws_(function () { importRun(); }, 'IMPORT', 'bị chặn khi còn dòng lỗi');
+  chg.getRange(3, 5, 1, 1).setValue('Ví - Cục Cá'); // sửa nguồn (bản sao)
+  var b0 = bal_('W001');
+  var out = importRun(2); // chia lô: chỉ ghi 2 trước
+  ok_(/CÒN 1 giao dịch/.test(out) || /CÒN/.test(out), 'còn phần chưa ghi');
+  eq_(readAll_('Transactions').length, 2, 'lô 1 ghi 2');
+  var out2 = importRun(50);
+  eq_(readAll_('Transactions').length, 5, 'tổng 5 giao dịch (3 finance + 2 chuyển)');
+  var out3 = importRun(50);
+  eq_(readAll_('Transactions').length, 5, 'chạy lại không nhân đôi');
+  ok_(/\(finance\)\: KHỚP/.test(out3) && /\(change\)\: KHỚP/.test(out3), 'đối chiếu khớp: ' + out3);
+  eq_(bal_('W001'), b0, 'lịch sử trước ngày bắt đầu ví không đổi số dư');
+  ok_(integrityScan_().ok, 'toàn vẹn sau nhập');
+  var tx = readAll_('Transactions'), tm = txnMap_(tx);
+  var f = cashFlow_('2024-05', tx, tm);
+  eq_(f.income, 9000000, 'thu lịch sử'); eq_(f.expense, 350000, 'chi lịch sử (CT tower và Điều chỉnh bị bỏ qua)');
+  var exp = tx.filter(function (t) { return t.idempotency_key === 'imp:finance:a2'; })[0];
+  eq_(exp.paid_by, 'M01', 'người chi theo cột Sở hữu'); eq_(exp.jar_id, 'J1', 'lọ theo danh mục');
+  DriveApp.getFileById(src.getId()).setTrashed(true);
+  FF_CTX.importSrc = null;
+});
+
 // ---------- runner ----------
 function runAllTests() { return runTests_(null); }
 
@@ -607,7 +661,7 @@ function runTests_(onlyNames) {
     FF_TESTS.forEach(function (t) {
       if (onlyNames && onlyNames.indexOf(t.name) < 0) return;
       // tamper tests mutate sheets, so give each one a fresh environment
-      var isolated = /^Toàn vẹn|^Thiết lập|^Dữ liệu nền|^Trigger|^Sao lưu|^Nhắc nhở/.test(t.name);
+      var isolated = /^Toàn vẹn|^Thiết lập|^Dữ liệu nền|^Trigger|^Sao lưu|^Nhắc nhở|^Nhập Excel/.test(t.name);
       var inner = null;
       if (isolated) { inner = testEnvBegin_(); }
       try { t.fn(); results.pass++; }
