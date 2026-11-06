@@ -651,6 +651,23 @@ test_('Nhập Excel cũ: ImportMap bắt buộc quyết định, chống trùng,
   FF_CTX.importSrc = null;
 });
 
+
+test_('Chạy thiết lập lần đầu trên bảng tính hoàn toàn trống (chưa có sheet nào)', function () {
+  var savedSs = FF_CTX.ss, savedEmail = FF_CTX.asEmail, savedCache = FF_CTX.cache;
+  var blank = SpreadsheetApp.create('FF_BLANK_TEST');
+  FF_CTX.ss = blank; FF_CTX.cache = {}; FF_CTX.asEmail = T_EMAIL_1;
+  try {
+    var r = setupSpreadsheet(); // phải không bị lỗi dù chưa có sheet Members
+    ok_(r.created.indexOf('Members') >= 0, 'tạo sheet Members');
+    eq_(checkSetup().indexOf('Chưa nhập email') >= 0, true, 'checkSetup báo thiếu email (chưa crash)');
+    setupSpreadsheet(); // chạy lại lần 2 không được lỗi, không tạo trùng
+    eq_(readAll_('Wallets').length, 8, 'ví đã gieo đúng 1 lần');
+  } finally {
+    try { DriveApp.getFileById(blank.getId()).setTrashed(true); } catch (e) { /* ignore */ }
+    FF_CTX.ss = savedSs; FF_CTX.asEmail = savedEmail; FF_CTX.cache = savedCache;
+  }
+});
+
 // ---------- runner ----------
 function runAllTests() { return runTests_(null); }
 
@@ -661,7 +678,7 @@ function runTests_(onlyNames) {
     FF_TESTS.forEach(function (t) {
       if (onlyNames && onlyNames.indexOf(t.name) < 0) return;
       // tamper tests mutate sheets, so give each one a fresh environment
-      var isolated = /^Toàn vẹn|^Thiết lập|^Dữ liệu nền|^Trigger|^Sao lưu|^Nhắc nhở|^Nhập Excel/.test(t.name);
+      var isolated = /^Toàn vẹn|^Thiết lập|^Dữ liệu nền|^Trigger|^Sao lưu|^Nhắc nhở|^Nhập Excel|^Chạy thiết lập/.test(t.name);
       var inner = null;
       if (isolated) { inner = testEnvBegin_(); }
       try { t.fn(); results.pass++; }

@@ -259,6 +259,9 @@ function currentEmail_() {
 // Returns the active member row for the signed-in Google account, or throws.
 // opts.allowEmpty: allow when no member has an email yet (first-time setup by the owner).
 function requireMember_(opts) {
+  // Bootstrap case: brand-new spreadsheet, setupSpreadsheet() has not run yet, so the
+  // Members sheet does not exist. Only allowed to pass through when allowEmpty is set.
+  if (opts && opts.allowEmpty && !getSs_().getSheetByName('Members')) return null;
   var email = currentEmail_();
   var members = readAll_('Members');
   var withEmail = members.filter(function (m) { return m.email; });
