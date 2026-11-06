@@ -2,6 +2,8 @@
 var FF_V = FF_V || {};
 FF_V.Reports = '0.3.0';
 
+function vnd_(n) { var neg = n < 0; return (neg ? '-' : '') + String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ' ₫'; }
+
 function nameMap_(sheet, idCol, nameCol) {
   var m = {};
   readAll_(sheet).forEach(function (r) { m[r[idCol]] = r[nameCol]; });
@@ -93,7 +95,7 @@ function dashboard_(m, period) {
   var budget = budgetView_(m, period);
   var alerts = [];
   budget.jars.forEach(function (j) {
-    if (j.status === 'over') alerts.push({ level: 'over', text: 'Lọ "' + j.name + '" đã vượt ngân sách ' + (j.spent - j.budget) });
+    if (j.status === 'over') alerts.push({ level: 'over', text: 'Lọ "' + j.name + '" đã vượt ngân sách ' + vnd_(j.spent - j.budget) });
     else if (j.status === 'warn') alerts.push({ level: 'warn', text: 'Lọ "' + j.name + '" đã dùng ' + j.pct + '% ngân sách' });
   });
   var recent = listTxns_(m, { limit: 8 }).rows;
