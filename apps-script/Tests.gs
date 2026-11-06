@@ -693,6 +693,7 @@ test_('Nhập Excel cũ: ImportMap bắt buộc quyết định, chống trùng,
   chg.getRange(1, 1, 1, 5).setValues([['ID', 'Ngày', 'Số tiền', 'Từ', 'Đến']]);
   chg.getRange(2, 1, 2, 5).setValues([['c1', '2024-05-06', 3000000, 'BIDV - Cục Thịt', 'VÍ - Cục Cá'], ['c2', '2024-05-07', 1000, 'HSBC', 'Ví khong co']]);
   readAll_('Wallets').forEach(function (w) { updateRow_('Wallets', w._row, { opening_date: '2026-11-01' }); });
+  saveCategory_(m, { name: 'Đối soát cũ (lịch sử) - thiếu hụt', kind: 'expense', jar_id: 'J1' });
   FF_CTX.importSrc = src.getId();
   importPrepare();
   var sh = getSs_().getSheetByName('ImportMap'), vals = sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues();
@@ -700,7 +701,7 @@ test_('Nhập Excel cũ: ImportMap bắt buộc quyết định, chống trùng,
   eq_(actionOf('Chi', 'Đi chợ'), 'expense', 'đề xuất khớp tên');
   eq_(actionOf('Chi', 'Siêu Thị'), 'expense', 'khớp không phân biệt hoa thường');
   eq_(actionOf('Chi', 'Mục lạ XYZ'), 'review', 'chưa quyết định (danh mục lạ)');
-  eq_(actionOf('Chi', 'Điều chỉnh'), 'skip', 'áp dụng quyết định 06/11/2026 tự động');
+  eq_(actionOf('Chi', 'Điều chỉnh'), 'expense', 'áp dụng quyết định 07/11/2026: không dùng được adjustment (chặn ngày trước opening_date), chuyển sang chi tiêu lịch sử');
   eq_(actionOf('Thu', 'Lương'), 'income', 'thu Lương');
   throws_(function () { importRun(); }, 'IMPORT', 'bị chặn khi còn review');
   eq_(readAll_('Transactions').length, 0, 'chưa ghi gì');
@@ -716,15 +717,15 @@ test_('Nhập Excel cũ: ImportMap bắt buộc quyết định, chống trùng,
   ok_(/CÒN 1 giao dịch/.test(out) || /CÒN/.test(out), 'còn phần chưa ghi');
   eq_(readAll_('Transactions').length, 2, 'lô 1 ghi 2');
   var out2 = importRun(50);
-  eq_(readAll_('Transactions').length, 5, 'tổng 5 giao dịch (3 finance + 2 chuyển)');
+  eq_(readAll_('Transactions').length, 6, 'tổng 6 giao dịch (4 finance + 2 chuyển)');
   var out3 = importRun(50);
-  eq_(readAll_('Transactions').length, 5, 'chạy lại không nhân đôi');
+  eq_(readAll_('Transactions').length, 6, 'chạy lại không nhân đôi');
   ok_(/\(finance\)\: KHỚP/.test(out3) && /\(change\)\: KHỚP/.test(out3), 'đối chiếu khớp: ' + out3);
   eq_(bal_('W001'), b0, 'lịch sử trước ngày bắt đầu ví không đổi số dư');
   ok_(integrityScan_().ok, 'toàn vẹn sau nhập');
   var tx = readAll_('Transactions'), tm = txnMap_(tx);
   var f = cashFlow_('2024-05', tx, tm);
-  eq_(f.income, 9000000, 'thu lịch sử'); eq_(f.expense, 350000, 'chi lịch sử (Mục lạ XYZ và Điều chỉnh bị bỏ qua)');
+  eq_(f.income, 9000000, 'thu lịch sử'); eq_(f.expense, 357000, 'chi lịch sử (Mục lạ XYZ bị bỏ qua; Điều chỉnh 7.000 nay tính là chi tiêu lịch sử)');
   var exp = tx.filter(function (t) { return t.idempotency_key === 'imp:finance:a2'; })[0];
   eq_(exp.paid_by, 'M01', 'người chi theo cột Sở hữu'); eq_(exp.jar_id, 'J1', 'lọ theo danh mục');
   DriveApp.getFileById(src.getId()).setTrashed(true);

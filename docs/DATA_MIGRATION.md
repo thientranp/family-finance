@@ -64,3 +64,20 @@ Các nhóm chi tiêu thông thường (Đi chợ, Ăn ngoài, Cà phê, Xăng d�
 **Kết quả chạy thử lại trên dữ liệu thật sau khi áp dụng quyết định trên:** 4.245 dòng finance + 369 dòng chuyển ví nhập được (1,88 tỷ đ), 259 dòng bị bỏ qua có chủ đích (3,66 tỷ đ, các khoản đầu tư/tiết kiệm/vay mượn/đối soát/mua tài sản lớn như CT tower), 0 dòng còn "chưa quyết định", 0 lỗi, đối chiếu số dòng và tổng tiền khớp tuyệt đối.
 
 Nếu sau này muốn sửa lại một quyết định nào (ví dụ đổi "CT tower" từ skip sang ghi nhận là tài sản riêng), sửa trực tiếp cột `action`/`target_category` trong sheet `ImportMap` rồi chạy lại `importDryRun()` → `importRun()`.
+
+## Cập nhật quyết định — 07/11/2026
+
+Sau khi rà lại từng dòng gốc (không chỉ dựa tên mục), các dòng "skip" sau trong bảng trên **đã được xem lại và đổi quyết định**: CT tower, Điều chỉnh (Chi+Thu), Tiết kiệm (Chi+Thu), Chứng khoán (Chi+Thu), Trả góp, Ô tô, Chi phí, Phí thẻ. Quyết định mới cho từng nhóm — xem đầy đủ lý do và số liệu chi tiết ở mục "Nhập dữ liệu lịch sử — các nhóm còn mơ hồ (quyết định 07/11/2026)" trong `BUSINESS_RULES.md`. "Cho vay"/"Mượn tiền" **vẫn giữ skip** (lý do đổi khác: 85% dòng không có số tiền thật, không phải vì chưa rõ bản chất).
+
+**Lưu ý kỹ thuật quan trọng:** nhóm "Điều chỉnh" ban đầu định dùng nghiệp vụ "đối soát số dư ví" (`adjustment`), nhưng nghiệp vụ này **chặn mọi ngày trước ngày bắt đầu của ví** — mà toàn bộ dữ liệu lịch sử (2022–2025) đều trước ngày bắt đầu ví thật (01/11/2026). Vì vậy đã đổi sang nhập như chi tiêu/thu nhập lịch sử bình thường dưới 2 danh mục mới riêng (xem danh sách dưới).
+
+**Trạng thái: CHƯA THỰC HIỆN.** Việc tạo các đối tượng mới trước khi import gồm:
+- Ví mới (loại `savings`): "Tiết kiệm - Cục Cá", "SSI - Chứng khoán", "Pinetree - Chứng khoán", "Entrade - Chứng khoán".
+- Danh mục chi tiêu mới: "Phí ngân hàng & thẻ", "Phí hành chính - giấy tờ", "Trả nợ vay cũ (đã tất toán)", "Đối soát cũ (lịch sử) - thiếu hụt" (thay cho `adjustment`, xem lưu ý trên).
+- Danh mục thu nhập mới: "Thu nhập Vending" (giữ như cũ, không đổi), "Đối soát cũ (lịch sử) - phát sinh" (thay cho `adjustment`, xem lưu ý trên).
+- Tài sản mới: "Nhà - CT Tower" (loại Nhà, 1.040.700.000đ), "Xe Cx3" (loại Xe, **600.000.000đ** — giá mua đầy đủ, đã sửa lại sau khi bạn xác nhận; không phải 190.000.000đ là số tiền trả trước), "Máy bán nước tự động" (loại Khác, 20.000.000đ).
+- Khoản vay mới: "Vay mua xe Cx3" — dư nợ ban đầu = **410.000.000đ** (600tr giá xe − 190tr trả trước, theo số bạn xác nhận), ngày bắt đầu nên đặt 22/01/2025 (ngày vay thực tế theo `oto.xlsx`) để các kỳ trả góp sau đó không bị chặn bởi ngày bắt đầu khoản vay.
+
+Sau khi các đối tượng trên có trong hệ thống, sẽ cập nhật `FF_IMPORT_DECISIONS`/`FF_IMPORT_ROW_OVERRIDES` trong `Import.gs` để trỏ đúng `target_category`/ví/tài sản/khoản vay, chạy lại `importDryRun()` → `importRun()`, rồi đối chiếu lại tổng tiền + chạy kiểm tra toàn vẹn.
+
+Riêng 19/23 kỳ trả góp xe trong `oto.xlsx` **không có trong sheet `finance` gốc** (chỉ 4 kỳ đầu + tiền trả trước được ghi) — sẽ nhập bằng một bước riêng (không qua `ImportMap`), trừ từ ví "Vietinbank - Cục Thịt" vào khoản vay "Vay mua xe Cx3", sau khi khoản vay đã tồn tại.
