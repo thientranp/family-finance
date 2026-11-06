@@ -607,7 +607,7 @@ test_('Nhập Excel cũ: ImportMap bắt buộc quyết định, chống trùng,
     ['a1', '2024-05-01', 'e', 'Chi', 'Đi chợ', 100000, 'VÍ - Cục Cá', 'Cục Cá', 'chợ'],
     ['a2', '2024-05-02', 'e', 'Chi', 'Siêu Thị', 250000, 'Ví - Cục Thịt', 'Cục Thịt', ''],
     ['a3', '2024-05-03', 'e', 'Thu', 'Lương', 9000000, 'BIDV - Cục Thịt', 'Cục Thịt', ''],
-    ['a4', '2024-05-04', 'e', 'Chi', 'CT tower', 500000000, 'HSBC', 'Cục Thịt', 'cần quyết định'],
+    ['a4', '2024-05-04', 'e', 'Chi', 'Mục lạ XYZ', 500000000, 'HSBC', 'Cục Thịt', 'cần quyết định'],
     ['a5', '2024-05-05', 'e', 'Chi', 'Điều chỉnh', 7000, 'Ví - Cục Cá', 'Cục Cá', '']
   ];
   fin.getRange(2, 1, frows.length, 9).setValues(frows);
@@ -620,13 +620,14 @@ test_('Nhập Excel cũ: ImportMap bắt buộc quyết định, chống trùng,
   function actionOf(k, c) { return vals.filter(function (v) { return v[0] === k && v[1] === c; })[0][4]; }
   eq_(actionOf('Chi', 'Đi chợ'), 'expense', 'đề xuất khớp tên');
   eq_(actionOf('Chi', 'Siêu Thị'), 'expense', 'khớp không phân biệt hoa thường');
-  eq_(actionOf('Chi', 'CT tower'), 'review', 'chưa quyết định');
+  eq_(actionOf('Chi', 'Mục lạ XYZ'), 'review', 'chưa quyết định (danh mục lạ)');
+  eq_(actionOf('Chi', 'Điều chỉnh'), 'skip', 'áp dụng quyết định 06/11/2026 tự động');
   eq_(actionOf('Thu', 'Lương'), 'income', 'thu Lương');
   throws_(function () { importRun(); }, 'IMPORT', 'bị chặn khi còn review');
   eq_(readAll_('Transactions').length, 0, 'chưa ghi gì');
-  // người dùng quyết định
+  // người dùng quyết định phần còn lại (danh mục lạ không có trong bảng quyết định)
   function setAction(k, c, a, tgt) { for (var i = 0; i < vals.length; i++) if (vals[i][0] === k && vals[i][1] === c) sh.getRange(i + 2, 5, 1, 2).setValues([[a, tgt || vals[i][5]]]); }
-  setAction('Chi', 'CT tower', 'skip'); setAction('Chi', 'Điều chỉnh', 'skip');
+  setAction('Chi', 'Mục lạ XYZ', 'skip');
   var dry = importDryRun();
   ok_(/Ví chuyển không nhận diện được/.test(dry), 'báo ví lạ');
   throws_(function () { importRun(); }, 'IMPORT', 'bị chặn khi còn dòng lỗi');
@@ -644,7 +645,7 @@ test_('Nhập Excel cũ: ImportMap bắt buộc quyết định, chống trùng,
   ok_(integrityScan_().ok, 'toàn vẹn sau nhập');
   var tx = readAll_('Transactions'), tm = txnMap_(tx);
   var f = cashFlow_('2024-05', tx, tm);
-  eq_(f.income, 9000000, 'thu lịch sử'); eq_(f.expense, 350000, 'chi lịch sử (CT tower và Điều chỉnh bị bỏ qua)');
+  eq_(f.income, 9000000, 'thu lịch sử'); eq_(f.expense, 350000, 'chi lịch sử (Mục lạ XYZ và Điều chỉnh bị bỏ qua)');
   var exp = tx.filter(function (t) { return t.idempotency_key === 'imp:finance:a2'; })[0];
   eq_(exp.paid_by, 'M01', 'người chi theo cột Sở hữu'); eq_(exp.jar_id, 'J1', 'lọ theo danh mục');
   DriveApp.getFileById(src.getId()).setTrashed(true);

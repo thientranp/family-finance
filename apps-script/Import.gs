@@ -67,7 +67,46 @@ function impCats_() {
   return byName;
 }
 
-// Writes/refreshes ImportMap. Existing decisions are kept; new categories get a proposal.
+// Final decisions for the 32 ambiguous category groups, confirmed by the user on 2026-11-06
+// (reviewed from Ra_soat_giao_dich_chua_ro.xlsx: blank cells -> skip, classified where possible,
+// otherwise skip; the user may adjust later directly in the ImportMap sheet before re-running).
+var FF_IMPORT_DECISIONS = {
+  'Chi|CT tower': { action: 'skip' },
+  'Thu|Tiết kiệm': { action: 'skip' },
+  'Thu|Gia đình': { action: 'skip' },
+  'Chi|Chứng khoán': { action: 'skip' },
+  'Thu|Chứng khoán': { action: 'skip' },
+  'Chi|Ô tô': { action: 'skip' },
+  'Thu|Thưởng': { action: 'income', target: 'Thu khác' },
+  'Chi|Tiết kiệm': { action: 'skip' },
+  'Chi|Điều chỉnh': { action: 'skip' },
+  'Thu|Điều chỉnh': { action: 'skip' },
+  'Thu|Cheppy': { action: 'income', target: 'Thu khác' },
+  'Chi|Coin': { action: 'skip' },
+  'Thu|Vending': { action: 'income', target: 'Thu nhập chung (Vending, Coin)' },
+  'Chi|Vending': { action: 'skip' },
+  'Thu|Khác': { action: 'income', target: 'Thu khác' },
+  'Chi|Trả góp': { action: 'skip' },
+  'Chi|Gia đình': { action: 'skip' },
+  'Thu|Được tặng': { action: 'income', target: 'Thu khác' },
+  'Chi|Em - Ba': { action: 'skip' },
+  'Chi|Em - Mẹ': { action: 'skip' },
+  'Thu|Cưới hỏi': { action: 'income', target: 'Thu khác' },
+  'Thu|Kinh doanh': { action: 'income', target: 'Thu khác' },
+  'Chi|Thuê xe': { action: 'expense', target: 'Di chuyển' },
+  'Chi|Chi phí': { action: 'skip' },
+  'Chi|Em - Hùng': { action: 'skip' },
+  'Chi|Cho vay': { action: 'skip' },
+  'Thu|Lì xì': { action: 'income', target: 'Thu khác' },
+  'Thu|Họ hàng': { action: 'income', target: 'Thu khác' },
+  'Thu|Mượn tiền': { action: 'skip' },
+  'Chi|Ba - Điện': { action: 'expense', target: 'Hoá đơn điện' },
+  'Chi|Phí thẻ': { action: 'expense', target: 'Phí chung cư' },
+  'Thu|Tiền lãi': { action: 'income', target: 'Lãi tiết kiệm' }
+};
+
+// Writes/refreshes ImportMap. Existing decisions (already in the sheet) are kept; new groups fall
+// back to FF_IMPORT_DECISIONS, then to matching an existing category by name, then to "review".
 function impPrepareMap_(fin) {
   var cats = impCats_(), agg = {};
   fin.forEach(function (r) {
@@ -81,9 +120,13 @@ function impPrepareMap_(fin) {
     var a = agg[k], prev = old[k];
     var action = prev && prev[4] ? String(prev[4]) : '', target = prev && prev[5] ? String(prev[5]) : '', note = prev && prev[6] ? String(prev[6]) : '';
     if (!action) {
-      var ck = (a.kind === 'Chi' ? 'expense' : 'income') + '|' + impKey_(a.cat);
-      if (cats[ck]) { action = a.kind === 'Chi' ? 'expense' : 'income'; target = cats[ck].name; }
-      else { action = 'review'; note = 'Cần bạn quyết định: chi tiêu thật, thu nhập thật, hay bỏ qua?'; }
+      var dec = FF_IMPORT_DECISIONS[k];
+      if (dec) { action = dec.action; target = dec.target || ''; note = 'Theo quyết định 06/11/2026 (đã duyệt file rà soát). Có thể sửa lại.'; }
+      else {
+        var ck = (a.kind === 'Chi' ? 'expense' : 'income') + '|' + impKey_(a.cat);
+        if (cats[ck]) { action = a.kind === 'Chi' ? 'expense' : 'income'; target = cats[ck].name; }
+        else { action = 'review'; note = 'Cần bạn quyết định: chi tiêu thật, thu nhập thật, hay bỏ qua?'; }
+      }
     }
     return [a.kind, a.cat, a.rows, a.total, action, target, note];
   });
