@@ -268,6 +268,57 @@ test_('Khoản vay: trả nợ giảm dư nợ, không vượt dư nợ, điều
   eq_(view.paid, 0, 'tổng đã trả sau đảo');
 });
 
+test_('Khoản vay: kỳ hạn vay, lãi suất theo thời điểm (chỉ theo dõi), lịch sử trả', function () {
+  var m = asUser_(T_EMAIL_1);
+  eq_(monthsBetween_('2025-01-01', '2025-01-01'), 0, '0 tháng cùng ngày');
+  eq_(monthsBetween_('2025-01-01', '2025-04-01'), 3, '3 tháng tròn');
+  eq_(monthsBetween_('2025-01-15', '2025-04-01'), 2, 'chưa đủ tháng thứ 3 (14/01 mới tròn)');
+  eq_(monthsBetween_('2025-01-01', '2026-01-01'), 12, '12 tháng = 1 năm');
+
+  var l = createLiability_(m, { name: 'Vay kỳ hạn thử', original_amount: 100000000, opening_balance: 100000000, opening_date: '2025-01-01', term_months: 24 });
+  var v = assetsView_().liabilities.filter(function (x) { return x.liability_id === l.liability_id; })[0];
+  eq_(v.term_months, 24, 'kỳ hạn lưu đúng');
+  eq_(v.remaining_months, Math.max(24 - monthsBetween_('2025-01-01', todayYmd_()), 0), 'số tháng còn lại tính đúng');
+
+  throws_(function () { createLiability_(m, { name: 'Vay kỳ hạn sai', opening_balance: 1000000, opening_date: T_D, term_months: 0 }); }, 'LIAB', 'kỳ hạn phải dương');
+  throws_(function () { createLiability_(m, { name: 'Vay kỳ hạn sai 2', opening_balance: 1000000, opening_date: T_D, term_months: 2000 }); }, 'LIAB', 'kỳ hạn quá lớn');
+
+  updateLiability_(m, { liability_id: l.liability_id, term_months: 36, name: 'Vay kỳ hạn thử (đã sửa)' });
+  var v2 = assetsView_().liabilities.filter(function (x) { return x.liability_id === l.liability_id; })[0];
+  eq_(v2.term_months, 36, 'sửa kỳ hạn');
+  eq_(v2.name, 'Vay kỳ hạn thử (đã sửa)', 'sửa tên');
+
+  // Lãi suất: chỉ lưu lịch sử, không ảnh hưởng dư nợ.
+  addLiabilityRate_(m, { liability_id: l.liability_id, effective_date: '2025-01-01', rate_percent: 8.5, note: 'Lãi suất năm đầu' });
+  addLiabilityRate_(m, { liability_id: l.liability_id, effective_date: '2026-01-01', rate_percent: 9.2, note: 'Sau ưu đãi' });
+  throws_(function () { addLiabilityRate_(m, { liability_id: l.liability_id, effective_date: T_D, rate_percent: -1 }); }, 'AMOUNT', 'lãi suất âm');
+  var rates = liabilityRates_(l.liability_id);
+  eq_(rates.length, 2, '2 lần đổi lãi suất');
+  eq_(rates[0].rate_percent, 8.5, 'sắp theo ngày áp dụng tăng dần');
+  eq_(rates[1].rate_percent, 9.2, 'mức mới nhất');
+  eq_(liabilityBalances_()[l.liability_id], 100000000, 'lãi suất không đụng tới dư nợ');
+
+  // Lịch sử trả: trả 2 kỳ rồi đảo 1 kỳ, kiểm tra dư nợ còn lại sau từng dòng.
+  inc_(m, 'W004', 50000000);
+  postOne_(m, { kind: 'loan_payment', date: '2025-02-01', amount: 3000000, wallet_id: 'W004', liability_id: l.liability_id });
+  postOne_(m, { kind: 'loan_payment', date: '2025-03-01', amount: 2500000, wallet_id: 'W004', liability_id: l.liability_id });
+  var h = liabilityHistory_(l.liability_id);
+  eq_(h.entries.length, 2, '2 dòng lịch sử');
+  eq_(h.entries[0].date, '2025-02-01', 'kỳ đầu đúng ngày');
+  eq_(h.entries[0].balance_after, 97000000, 'dư nợ sau kỳ 1');
+  eq_(h.entries[1].balance_after, 94500000, 'dư nợ sau kỳ 2');
+  eq_(h.entries[0].wallet_name, 'BIDV - Cục Thịt', 'ví trả đúng tên (W004)');
+  eq_(h.liability.remaining_months, 36 - monthsBetween_('2025-01-01', todayYmd_()), 'số tháng còn lại khớp');
+  eq_(h.rates.length, 2, 'lịch sử lãi suất đi kèm');
+  var pay2 = h.entries[1];
+  postOne_(m, { kind: 'reversal', date: T_D, txn_id: pay2.txn_id, reason: 'Trả nhầm kỳ 2' });
+  var h2 = liabilityHistory_(l.liability_id);
+  eq_(h2.entries.filter(function (e) { return !e.reversed; }).length, 2, 'vẫn 2 dòng gốc (đảo tạo thêm 1 dòng LiabilityEntries riêng)');
+  eq_(h2.liability.balance, 97000000, 'dư nợ hiện tại sau đảo kỳ 2');
+
+  throws_(function () { liabilityHistory_('D999'); }, 'LIAB', 'khoản vay không tồn tại');
+});
+
 test_('Nợ cá nhân: cho vay/vay nợ trừ-cộng ví ngay, thu/trả nợ, điều chỉnh, đảo, tài sản ròng', function () {
   var m = asUser_(T_EMAIL_1);
   var nw0 = netWorth_();
@@ -677,6 +728,22 @@ test_('Thiết lập chạy lại không làm mất dữ liệu và kiểm tra c
   eq_(checkSetup(), 'Mọi thứ đã sẵn sàng.', 'checkSetup');
   var sh = getSheet_('Wallets'); sh.getRange(1, 2).setValue('doi_ten');
   throws_(function () { setupCore_(getSs_()); }, 'SETUP', 'tiêu đề cột bị đổi');
+});
+
+test_('Thiết lập tự vá cột mới thêm sau (vd term_months) mà không mất dữ liệu cũ', function () {
+  var m = asUser_(T_EMAIL_1);
+  var liab = createLiability_(m, { name: 'Vay giả lập sheet cũ', original_amount: 100000000, opening_balance: 90000000, opening_date: '2026-11-01' });
+  // Giả lập 1 spreadsheet cũ (trước khi có cột term_months): xoá nội dung cột cuối ở MỌI dòng, kể cả
+  // tiêu đề, giống hệt 1 sheet được tạo bởi phiên bản schema trước đó.
+  var sh = getSheet_('Liabilities'), lastCol = schemaOf_('Liabilities').cols.length;
+  var lastRow = sh.getLastRow();
+  sh.getRange(1, lastCol, lastRow, 1).clearContent();
+  eq_(sh.getLastColumn(), lastCol - 1, 'giả lập header thiếu cột cuối');
+  var rep = setupCore_(getSs_());
+  ok_(rep.created.indexOf('Liabilities.term_months') >= 0, 'đã vá thêm cột term_months');
+  eq_(sh.getRange(1, lastCol).getValue(), 'term_months', 'tiêu đề cột mới đúng tên');
+  eq_(readAll_('Liabilities').filter(function (l) { return l.liability_id === liab.liability_id; })[0].name, 'Vay giả lập sheet cũ', 'dữ liệu cũ còn nguyên');
+  eq_(checkSetup(), 'Mọi thứ đã sẵn sàng.', 'checkSetup sau khi vá');
 });
 
 test_('Dữ liệu nền theo đặc tả', function () {

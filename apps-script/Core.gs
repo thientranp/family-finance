@@ -19,8 +19,12 @@ var FF_SCHEMA = {
   Transactions: 'txn_id:t,txn_kind:t,txn_date:t,amount:n,category_id:t,jar_id:t,paid_by:t,beneficiary:t,note:t,reason:t,balance_before:n,balance_after:n,reverses_id:t,ref_id:t,idempotency_key:t,entry_count:n,created_by:t,created_at:t,prev_hash:t,row_hash:t',
   Entries: 'entry_id:t,txn_id:t,wallet_id:t,amount:n',
   Assets: 'asset_id:t,asset_type:t,name:t,purchase_value:n,purchase_date:t,note:t,active:n',
-  Liabilities: 'liability_id:t,name:t,original_amount:n,opening_balance:n,opening_date:t,status:t',
+  Liabilities: 'liability_id:t,name:t,original_amount:n,opening_balance:n,opening_date:t,status:t,term_months:n',
   LiabilityEntries: 'entry_id:t,txn_id:t,liability_id:t,amount:n',
+  // Lãi suất chỉ để theo dõi (không dùng trong bất kỳ phép tính nào) — mỗi dòng là mức lãi suất áp
+  // dụng kể từ effective_date; "lãi suất hiện tại" = dòng có effective_date gần nhất không vượt quá
+  // hôm nay. Tách sheet riêng (không phải 1 cột trên Liabilities) vì lãi suất có thể đổi nhiều lần.
+  LiabilityRates: 'rate_id:t,liability_id:t,effective_date:t,rate_percent:n,note:t,created_at:t',
   // direction: 'lend' (gia đình cho người khác vay, người đó nợ gia đình) | 'borrow' (gia đình vay của người khác).
   // Không có cột số dư/opening_balance ở đây: số dư còn nợ luôn tính từ DebtEntries (bắt đầu từ 0, bắt đầu nợ thì đi kèm bút toán debt_lend/debt_borrow) để tránh ghi trùng và để đảo được bút toán một cách nhất quán.
   Debts: 'debt_id:t,direction:t,counterparty:t,original_amount:n,opening_date:t,note:t',
@@ -209,6 +213,16 @@ function amount_(v, label) {
 function signed_(v, label) {
   var n = toNumber_(v, label);
   if (Math.abs(n) > FF_MAX_AMOUNT) throw ffErr_('AMOUNT', (label || 'Số tiền') + ' quá lớn.');
+  return n;
+}
+
+// Decimal number within [0, max] — for values that are NOT money (e.g. lãi suất %), where
+// toNumber_'s "integer đồng only" rule doesn't apply.
+function pct_(v, label, max) {
+  if (v === '' || v === null || v === undefined) throw ffErr_('AMOUNT', (label || 'Giá trị') + ' không được để trống.');
+  var n = Number(v);
+  if (!isFinite(n)) throw ffErr_('AMOUNT', (label || 'Giá trị') + ' không hợp lệ.');
+  if (n < 0 || n > (max === undefined ? 100 : max)) throw ffErr_('AMOUNT', (label || 'Giá trị') + ' không hợp lệ.');
   return n;
 }
 

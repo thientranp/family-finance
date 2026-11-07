@@ -915,23 +915,70 @@ function renderLoansTab(){
     kids.push(h('div',{class:'card hero'},[h('div',{class:'lbl',text:'Tổng dư nợ'}),h('div',{class:'big',text:fmt(s.liabilities)})]));
     var lc=h('div',{class:'card'});
     if(!a.liabilities.length)lc.appendChild(h('div',{class:'empty',text:'Chưa có khoản vay.'}));
-    a.liabilities.forEach(function(l){ lc.appendChild(h('button',{class:'tap',type:'button',onclick:function(){loanSheet(l);}},[h('div',{class:'row'},[h('div',{class:'l'},[h('div',{class:'t',text:l.name}),h('div',{class:'s',text:'Đã trả '+fmt(l.paid)+' · vay gốc '+fmt(l.original_amount)})]),h('div',{class:'r exp',text:fmt(l.balance)})])])); });
+    a.liabilities.forEach(function(l){ lc.appendChild(h('button',{class:'tap',type:'button',onclick:function(){loanSheet(l);}},[h('div',{class:'row'},[h('div',{class:'l'},[h('div',{class:'t',text:l.name}),h('div',{class:'s',text:'Đã trả '+fmt(l.paid)+' · vay gốc '+fmt(l.original_amount)+(l.remaining_months!==null&&l.remaining_months!==''?' · còn '+l.remaining_months+' tháng':'')})]),h('div',{class:'r exp',text:fmt(l.balance)})])])); });
     kids.push(lc,h('button',{class:'btn primary block',type:'button',text:'Thêm khoản vay',onclick:loanForm}));
     $app.replaceChildren.apply($app,kids);
   },function(e){fail(e,renderLoansTab);});
 }
+// value,unit -> số tháng (unit 'year' thì *12); value rỗng -> '' (không khai báo kỳ hạn).
+function termMonthsField(initMonths){
+  var val=h('input',{type:'number',id:'ltv',min:'1',max:'1200',step:'1'});
+  var unit=selectEl([{v:'month',t:'Tháng'},{v:'year',t:'Năm'}],'month','ltu');
+  if(initMonths){ val.value=initMonths; unit.value='month'; }
+  var wrap=h('div',{style:'display:flex;gap:8px'},[val,unit]);
+  wrap.getMonths=function(){ if(!val.value)return ''; var n=Number(val.value); return unit.value==='year'?n*12:n; };
+  return wrap;
+}
 function loanForm(){
-  var name=h('input',{id:'ln',maxlength:'120'}), orig=moneyInput('','lo'), bal=moneyInput('','lb'), d=dateInput('', 'ld'), er=errBox(), sh; d.value=S.boot.settings.cutoff_date;
-  var body=h('div',null,[fld('Tên khoản vay',name),fld('Số tiền vay gốc',orig),fld('Dư nợ hiện tại',bal,'Số còn nợ tại ngày bắt đầu theo dõi.'),fld('Ngày bắt đầu theo dõi',d),er,
-    submitBtn('Lưu khoản vay',function(){ return api('createLiability',{name:name.value,original_amount:orig.getNumber(),opening_balance:bal.getNumber(),opening_date:d.value}).then(function(){sh.close();invalidateCache();toast('Đã thêm khoản vay');renderLoansTab();}); },er)]);
+  var name=h('input',{id:'ln',maxlength:'120'}), orig=moneyInput('','lo'), bal=moneyInput('','lb'), d=dateInput('', 'ld'), term=termMonthsField(''), er=errBox(), sh; d.value=S.boot.settings.cutoff_date;
+  var body=h('div',null,[fld('Tên khoản vay',name),fld('Số tiền vay gốc',orig),fld('Dư nợ hiện tại',bal,'Số còn nợ tại ngày bắt đầu theo dõi.'),fld('Ngày bắt đầu theo dõi',d),fld('Kỳ hạn vay (không bắt buộc)',term,'Để trống nếu chưa biết — có thể bổ sung sau.'),er,
+    submitBtn('Lưu khoản vay',function(){ return api('createLiability',{name:name.value,original_amount:orig.getNumber(),opening_balance:bal.getNumber(),opening_date:d.value,term_months:term.getMonths()}).then(function(){sh.close();invalidateCache();toast('Đã thêm khoản vay');renderLoansTab();}); },er)]);
   sh=openSheet('Thêm khoản vay',body);
 }
 function loanSheet(l){
-  var b=h('div',null,[h('div',{class:'row'},[h('span',{class:'s',text:'Dư nợ'}),h('strong',{text:fmt(l.balance)})]),h('div',{class:'row'},[h('span',{class:'s',text:'Đã trả'}),h('span',{text:fmt(l.paid)})])]), sh;
+  var sh;
+  var b=h('div',null,[h('div',{class:'row'},[h('span',{class:'s',text:'Dư nợ'}),h('strong',{text:fmt(l.balance)})]),h('div',{class:'row'},[h('span',{class:'s',text:'Đã trả'}),h('span',{text:fmt(l.paid)})]),h('div',{class:'row'},[h('span',{class:'s',text:'Kỳ hạn'}),h('span',{text:l.term_months?(l.term_months+' tháng · còn '+l.remaining_months+' tháng'):'Chưa khai báo'})])]);
+  var actions=h('div',{style:'display:flex;flex-direction:column;gap:8px;margin-top:12px'});
+  actions.append(h('button',{class:'btn block',type:'button',text:'Sửa tên / kỳ hạn',onclick:function(){sh.close();loanEditForm(l);}}));
+  actions.append(h('button',{class:'btn block',type:'button',text:'Lịch sử trả & lãi suất',onclick:function(){sh.close();loanHistorySheet(l);}}));
+  b.appendChild(actions);
   var actual=moneyInput(l.balance,'la'), why=h('input',{id:'lw',maxlength:'200'}), er=errBox();
   b.append(h('h2',{text:'Đối soát dư nợ với ngân hàng'}),fld('Dư nợ thực tế',actual),fld('Lý do (bắt buộc)',why),er,
     submitBtn('Điều chỉnh dư nợ',function(){ return api('loanAdjust',{liability_id:l.liability_id,actual_balance:actual.getNumber(),reason:why.value}).then(function(){sh.close();invalidateCache();toast('Đã điều chỉnh dư nợ');renderLoansTab();}); },er));
   sh=openSheet(l.name,b);
+}
+function loanEditForm(l){
+  var name=h('input',{id:'len',maxlength:'120'}), term=termMonthsField(l.term_months||''), er=errBox(), sh;
+  name.value=l.name;
+  var body=h('div',null,[fld('Tên khoản vay',name),fld('Kỳ hạn vay',term,'Để trống nếu chưa biết.'),er,
+    submitBtn('Lưu',function(){ return api('updateLiability',{liability_id:l.liability_id,name:name.value,term_months:term.getMonths()}).then(function(){sh.close();invalidateCache();toast('Đã lưu');renderLoansTab();}); },er)]);
+  sh=openSheet('Sửa: '+l.name,body);
+}
+function loanHistorySheet(l){
+  loading();
+  api('liabilityHistory',{liability_id:l.liability_id}).then(function(r){
+    var li=r.liability,b=h('div',null);
+    b.append(h('div',{class:'row'},[h('span',{class:'s',text:'Dư nợ hiện tại'}),h('strong',{text:fmt(li.balance)})]));
+    if(li.term_months)b.append(h('div',{class:'row'},[h('span',{class:'s',text:'Kỳ hạn'}),h('span',{text:li.term_months+' tháng · còn '+li.remaining_months+' tháng'})]));
+    b.append(h('h2',{text:'Lãi suất theo thời điểm'}),h('div',{class:'hint',text:'Chỉ để theo dõi, không dùng để tính dư nợ hay kỳ trả.'}));
+    var rc=h('div',{class:'card'});
+    if(!r.rates.length)rc.appendChild(h('div',{class:'empty',text:'Chưa có lịch sử lãi suất.'}));
+    r.rates.slice().reverse().forEach(function(rt){ rc.appendChild(h('div',{class:'row'},[h('div',{class:'l'},[h('div',{class:'t',text:rt.rate_percent+'%'}),h('div',{class:'s',text:'Từ '+dmy(rt.effective_date)+(rt.note?' · '+rt.note:'')})])])); });
+    b.append(rc,h('button',{class:'btn block',type:'button',text:'Thêm mức lãi suất mới',onclick:function(){loanRateForm(l);}}));
+    b.append(h('h2',{text:'Lịch sử trả nợ'}));
+    var hc=h('div',{class:'card'});
+    var real=r.entries.filter(function(e){return !e.reversed;});
+    if(!real.length)hc.appendChild(h('div',{class:'empty',text:'Chưa có lượt trả nào.'}));
+    real.forEach(function(e){ hc.appendChild(h('div',{class:'row'},[h('div',{class:'l'},[h('div',{class:'t',text:e.kind_label+(e.amount<0?'':' (ghi tăng)')}),h('div',{class:'s',text:dmy(e.date)+(e.wallet_name?' · '+e.wallet_name:'')+(e.note?' · '+e.note:'')})]),h('div',{class:'r',text:(e.amount<0?'-':'+')+fmt(Math.abs(e.amount))+' · còn '+fmt(e.balance_after)})])); });
+    b.append(hc);
+    openSheet('Lịch sử: '+li.name,b);
+  },function(e){fail(e,renderLoansTab);});
+}
+function loanRateForm(l){
+  var d=dateInput('','lrd'), rate=h('input',{type:'number',id:'lrr',min:'0',max:'100',step:'0.01'}), note=h('input',{id:'lrn',maxlength:'200'}), er=errBox(), sh;
+  var body=h('div',null,[fld('Ngày áp dụng',d),fld('Lãi suất (%/năm)',rate),fld('Ghi chú',note,'Ví dụ: hết ưu đãi, thả nổi...'),er,
+    submitBtn('Lưu',function(){ return api('addLiabilityRate',{liability_id:l.liability_id,effective_date:d.value,rate_percent:rate.value,note:note.value}).then(function(){sh.close();invalidateCache();toast('Đã lưu lãi suất');loanHistorySheet(l);}); },er)]);
+  sh=openSheet('Thêm mức lãi suất',body);
 }
 
 /* Admin: Danh mục, Lọ ngân sách, Nhắc nhở — mỗi mục màn hình riêng (trước đây gộp chung). */

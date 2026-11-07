@@ -58,19 +58,109 @@ function updateAsset_(m, p) {
   });
 }
 
+function liabilityOrThrow_(id) {
+  var l = readAll_('Liabilities').filter(function (x) { return x.liability_id === id; })[0];
+  if (!l) throw ffErr_('LIAB', 'Khoản vay không tồn tại.');
+  return l;
+}
+
+// term_months (optional): kỳ hạn vay tính bằng tháng. UI nhận "số năm" thì tự quy đổi *12 trước khi
+// gửi lên — ở đây luôn lưu và trả về theo tháng cho thống nhất.
 function createLiability_(m, p) {
   return withLock_(function () {
     var open = signed_(p.opening_balance, 'Dư nợ ban đầu');
     if (open < 0) throw ffErr_('AMOUNT', 'Dư nợ không được âm.');
     var orig = p.original_amount === undefined || p.original_amount === '' ? open : signed_(p.original_amount, 'Số tiền vay gốc');
+    var term = p.term_months === undefined || p.term_months === '' ? '' : toNumber_(p.term_months, 'Kỳ hạn vay (tháng)');
+    if (term !== '' && (term <= 0 || term > 1200)) throw ffErr_('LIAB', 'Kỳ hạn vay không hợp lệ.');
     var row = {
       liability_id: nextCode_('Liabilities', 'liability_id', 'D', 3), name: reqText_(p.name, 'Tên khoản vay', 2, 120),
-      original_amount: orig, opening_balance: open, opening_date: ymd_(p.opening_date, 'Ngày bắt đầu'), status: 'active'
+      original_amount: orig, opening_balance: open, opening_date: ymd_(p.opening_date, 'Ngày bắt đầu'), status: 'active',
+      term_months: term === '' ? '' : term
     };
     appendRows_('Liabilities', [row]);
-    audit_('liability:create', row.liability_id, { name: row.name, opening: open });
+    audit_('liability:create', row.liability_id, { name: row.name, opening: open, term_months: row.term_months });
     return { liability_id: row.liability_id };
   });
+}
+
+// Sửa tên / kỳ hạn vay. Không cho sửa original_amount/opening_balance/opening_date ở đây — những số
+// đó đã khoá vào các bút toán đã ghi (sửa tay sẽ làm lệch dư nợ đã tính); cần đối soát dư nợ thì dùng
+// loanAdjust (liability_adjustment) như hiện có.
+function updateLiability_(m, p) {
+  return withLock_(function () {
+    var l = liabilityOrThrow_(p.liability_id);
+    var patch = {};
+    if (p.name !== undefined) patch.name = reqText_(p.name, 'Tên khoản vay', 2, 120);
+    if (p.term_months !== undefined) {
+      if (p.term_months === '' || p.term_months === null) patch.term_months = '';
+      else {
+        var term = toNumber_(p.term_months, 'Kỳ hạn vay (tháng)');
+        if (term <= 0 || term > 1200) throw ffErr_('LIAB', 'Kỳ hạn vay không hợp lệ.');
+        patch.term_months = term;
+      }
+    }
+    updateRow_('Liabilities', l._row, patch);
+    audit_('liability:update', l.liability_id, { before: { name: l.name, term_months: l.term_months }, patch: patch });
+    return { liability_id: l.liability_id };
+  });
+}
+
+// Lãi suất CHỈ để theo dõi — không dùng trong bất kỳ phép tính dư nợ/trả góp nào (theo yêu cầu của
+// người dùng 07/11/2026). Mỗi lần đổi lãi suất là một dòng mới, không sửa đè dòng cũ, để giữ lịch sử.
+function addLiabilityRate_(m, p) {
+  return withLock_(function () {
+    var l = liabilityOrThrow_(p.liability_id);
+    var rate = pct_(p.rate_percent, 'Lãi suất (%)', 100);
+    var row = {
+      rate_id: nextCode_('LiabilityRates', 'rate_id', 'R', 3), liability_id: l.liability_id,
+      effective_date: ymd_(p.effective_date, 'Ngày áp dụng'), rate_percent: rate, note: clip_(p.note, 200), created_at: nowIso_()
+    };
+    appendRows_('LiabilityRates', [row]);
+    audit_('liability:rate', l.liability_id, { effective_date: row.effective_date, rate_percent: rate });
+    return { rate_id: row.rate_id };
+  });
+}
+
+function liabilityRates_(liabilityId) {
+  return readAll_('LiabilityRates').filter(function (r) { return r.liability_id === liabilityId; })
+    .sort(function (a, b) { return a.effective_date < b.effective_date ? -1 : a.effective_date > b.effective_date ? 1 : 0; });
+}
+
+// Lịch sử trả nợ của 1 khoản vay: từng giao dịch (trả nợ / điều chỉnh dư nợ / đảo bút toán) theo thứ
+// tự thời gian, kèm dư nợ còn lại sau mỗi dòng.
+function liabilityHistory_(liabilityId) {
+  var st = buildState_(), l = st.liabs[liabilityId];
+  if (!l) throw ffErr_('LIAB', 'Khoản vay không tồn tại.');
+  var rows = readAll_('LiabilityEntries').filter(function (e) { return e.liability_id === liabilityId; }).map(function (e) {
+    var t = st.txnMap[e.txn_id] || {};
+    var ent = (st.entriesBy[e.txn_id] || [])[0];
+    return {
+      txn_id: e.txn_id, date: t.txn_date, kind: t.txn_kind, kind_label: FF_KINDS[t.txn_kind] || t.txn_kind,
+      amount: e.amount, wallet_id: ent ? ent.wallet_id : '', wallet_name: ent && st.wallets[ent.wallet_id] ? st.wallets[ent.wallet_id].name : '',
+      note: t.note || t.reason || '', reversed: !!st.reversedBy[e.txn_id]
+    };
+  }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.txn_id < b.txn_id ? -1 : 1); });
+  var bal = l.opening_balance;
+  rows.forEach(function (r) { bal += r.amount; r.balance_after = bal; });
+  var remainingMonths = null;
+  if (l.term_months) {
+    var elapsed = monthsBetween_(l.opening_date, todayYmd_());
+    remainingMonths = Math.max(l.term_months - elapsed, 0);
+  }
+  return {
+    liability: { liability_id: l.liability_id, name: l.name, original_amount: l.original_amount, opening_balance: l.opening_balance, opening_date: l.opening_date, term_months: l.term_months || '', remaining_months: remainingMonths, balance: st.liabBal[liabilityId] },
+    entries: rows, rates: liabilityRates_(liabilityId)
+  };
+}
+
+// Số tháng tròn đã trôi qua từ "from" (yyyy-MM-dd) đến "to" — dùng để tính số tháng còn lại của kỳ
+// hạn vay (chỉ theo dõi, không ảnh hưởng số liệu tài chính).
+function monthsBetween_(from, to) {
+  var a = from.split('-').map(Number), b = to.split('-').map(Number);
+  var m = (b[0] - a[0]) * 12 + (b[1] - a[1]);
+  if (b[2] < a[2]) m--;
+  return Math.max(m, 0);
 }
 
 function liabilityBalances_() {
@@ -127,7 +217,9 @@ function assetsView_() {
   });
   var liabs = Object.keys(st.liabs).map(function (id) {
     var l = st.liabs[id];
-    return { liability_id: id, name: l.name, original_amount: l.original_amount, opening_balance: l.opening_balance, opening_date: l.opening_date, paid: paid[id] || 0, balance: st.liabBal[id] };
+    var remainingMonths = null;
+    if (l.term_months) remainingMonths = Math.max(l.term_months - monthsBetween_(l.opening_date, todayYmd_()), 0);
+    return { liability_id: id, name: l.name, original_amount: l.original_amount, opening_balance: l.opening_balance, opening_date: l.opening_date, term_months: l.term_months || '', remaining_months: remainingMonths, paid: paid[id] || 0, balance: st.liabBal[id] };
   });
   return { assets: assets, liabilities: liabs, summary: netWorth_() };
 }

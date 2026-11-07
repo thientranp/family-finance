@@ -2,6 +2,8 @@
 
 Mọi sheet có dòng 1 là tiêu đề. Kiểu: t = chữ (định dạng văn bản, kể cả ngày yyyy-MM-dd), n = số nguyên. Tiền là số nguyên đồng, không số lẻ. Boolean lưu 1/0.
 
+**Thêm cột mới vào sheet đã có dữ liệu:** chạy `setupSpreadsheet()` lại — `setupCore_` tự thêm cột mới vào **cuối** tiêu đề nếu sheet cũ còn thiếu (không đụng tới dữ liệu hay cột đã có), chỉ báo lỗi nếu một cột đã tồn tại bị đổi tên/đổi thứ tự thật sự. Vì vậy cột mới trong tài liệu này luôn được thêm ở cuối mỗi sheet, không chen giữa.
+
 ## Members
 
 | Cột | Kiểu |
@@ -117,14 +119,15 @@ Dòng sổ cái theo ví, số tiền có dấu (+ vào ví, − ra ví). Số d
 
 ## Liabilities
 
-| Cột | Kiểu |
-|---|---|
-| liability_id | t |
-| name | t |
-| original_amount | n |
-| opening_balance | n |
-| opening_date | t |
-| status | t |
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| liability_id | t | |
+| name | t | |
+| original_amount | n | |
+| opening_balance | n | |
+| opening_date | t | |
+| status | t | |
+| term_months | n | Kỳ hạn vay (tháng). Không bắt buộc (có thể để trống). Thêm 07/11/2026. |
 
 ## LiabilityEntries
 Dòng sổ cái theo khoản vay (dấu − = giảm dư nợ).
@@ -135,6 +138,18 @@ Dòng sổ cái theo khoản vay (dấu − = giảm dư nợ).
 | txn_id | t |
 | liability_id | t |
 | amount | n |
+
+## LiabilityRates
+Lãi suất theo từng thời điểm — **chỉ để theo dõi, không dùng trong bất kỳ phép tính dư nợ/kỳ trả nào**. Mỗi lần đổi lãi suất là 1 dòng mới (không sửa đè dòng cũ). Thêm 07/11/2026.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| rate_id | t | |
+| liability_id | t | |
+| effective_date | t | Ngày áp dụng mức lãi suất này |
+| rate_percent | n | %/năm, cho phép số thập phân |
+| note | t | |
+| created_at | t | |
 
 ## Debts
 Sổ nợ cá nhân (vay mượn người quen) — khác `Liabilities` (nợ ngân hàng). Không có cột số dư: số dư còn nợ luôn tính từ `DebtEntries`, bắt đầu từ 0 (xem Ledger bên dưới).

@@ -72,9 +72,20 @@ function setupCore_(ss) {
         try { sh.protect().setWarningOnly(true).setDescription('Chỉ ghi qua ứng dụng. Sửa tay sẽ bị ghi nhật ký.'); } catch (e) { /* protection is best effort */ }
       }
     } else {
+      // existingCols: how many header cells this sheet actually has right now, before comparing —
+      // needed to tell "column added later by a schema update" (blank, safe to backfill) apart from
+      // "column genuinely renamed/reordered" (real mismatch, must stop and ask).
+      var existingCols = sh.getLastColumn();
       var head = sh.getRange(1, 1, 1, def.cols.length).getValues()[0];
       for (var i = 0; i < def.cols.length; i++) {
-        if (head[i] !== def.cols[i]) throw ffErr_('SETUP', 'Sheet "' + name + '" có tiêu đề cột khác cấu trúc mong đợi ở cột ' + (i + 1) + '.');
+        if (i < existingCols) {
+          if (head[i] !== def.cols[i]) throw ffErr_('SETUP', 'Sheet "' + name + '" có tiêu đề cột khác cấu trúc mong đợi ở cột ' + (i + 1) + '.');
+        } else {
+          // Trailing column added by a later schema version (existing data untouched) — backfill.
+          sh.getRange(1, i + 1).setValue(def.cols[i]).setFontWeight('bold');
+          sh.getRange(1, i + 1, sh.getMaxRows(), 1).setNumberFormat(def.types[i] === 'n' ? '0' : '@');
+          report.created.push(name + '.' + def.cols[i]);
+        }
       }
     }
   });

@@ -70,6 +70,16 @@ function createMocks(opts = {}) {
       }
       return 0;
     }
+    getLastColumn() {
+      let last = 0;
+      for (const row of this.data) {
+        if (!row) continue;
+        for (let j = row.length - 1; j >= 0; j--) {
+          if (row[j] !== '' && row[j] !== undefined && row[j] !== null) { if (j + 1 > last) last = j + 1; break; }
+        }
+      }
+      return last;
+    }
     getRange(r, c, nr = 1, nc = 1) { return new Range(this, r, c, nr, nc); }
   }
 
