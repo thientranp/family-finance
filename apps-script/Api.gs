@@ -32,6 +32,7 @@ function ffApi_() { return {
   moveBudget: moveBudget_,
   createAsset: createAsset_,
   updateAsset: updateAsset_,
+  deleteAsset: deleteAsset_,
   createLiability: createLiability_,
   saveWallet: saveWallet_,
   setWalletOpening: setWalletOpening_,

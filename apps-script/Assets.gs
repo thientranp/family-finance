@@ -23,6 +23,24 @@ function createAsset_(m, p) {
   });
 }
 
+// True if any transaction (buy or sell, even a reversed one) ever referenced this asset — the line
+// between "safe to hard-delete" and "must only deactivate" (see deleteRow_ in Core.gs).
+function assetHasTxn_(assetId) {
+  return readAll_('Transactions').some(function (t) {
+    return t.ref_id === assetId && (t.txn_kind === 'asset_purchase' || t.txn_kind === 'asset_sale');
+  });
+}
+
+function deleteAsset_(m, p) {
+  return withLock_(function () {
+    var a = assetOrThrow_(p.asset_id);
+    if (assetHasTxn_(a.asset_id)) throw ffErr_('ASSET', 'Tài sản này đã có giao dịch (mua/bán) — không xoá được, chỉ có thể ẩn.');
+    deleteRow_('Assets', a._row);
+    audit_('asset:delete', a.asset_id, { name: a.name });
+    return { ok: true };
+  });
+}
+
 function updateAsset_(m, p) {
   return withLock_(function () {
     var a = assetOrThrow_(p.asset_id);
@@ -96,7 +114,7 @@ function netWorth_() {
 function assetsView_() {
   var st = buildState_();
   var assets = readAll_('Assets').map(function (a) {
-    return { asset_id: a.asset_id, type: a.asset_type, type_label: FF_ASSET_TYPES[a.asset_type] || a.asset_type, name: a.name, purchase_value: a.purchase_value, purchase_date: a.purchase_date, note: a.note, active: a.active, sold: !!st.assetSale[a.asset_id] };
+    return { asset_id: a.asset_id, type: a.asset_type, type_label: FF_ASSET_TYPES[a.asset_type] || a.asset_type, name: a.name, purchase_value: a.purchase_value, purchase_date: a.purchase_date, note: a.note, active: a.active, sold: !!st.assetSale[a.asset_id], has_txn: assetHasTxn_(a.asset_id) };
   });
   // Total repaid per liability = payments made (net of reversed payments).
   var paid = {};

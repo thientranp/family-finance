@@ -154,6 +154,15 @@ function updateRow_(name, rowNum, patch) {
   invalidate_(name);
 }
 
+// Hard-deletes a row. Reserved for reference rows that have never been referenced by any
+// transaction (e.g. an asset/liability created by mistake, zero history) — financial history
+// itself is never hard-deleted anywhere in this system (CLAUDE.md 2.3/15: prefer reversal/
+// correction entries, never delete financial records). Callers must verify "no history" first.
+function deleteRow_(name, rowNum) {
+  getSheet_(name).deleteRow(rowNum);
+  invalidate_(name);
+}
+
 // ---------- Time / validation ----------
 function todayYmd_() { return Utilities.formatDate(new Date(), FF_TZ, 'yyyy-MM-dd'); }
 function nowIso_() { return Utilities.formatDate(new Date(), FF_TZ, "yyyy-MM-dd'T'HH:mm:ssXXX"); }

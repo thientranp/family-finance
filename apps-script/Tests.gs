@@ -360,6 +360,21 @@ test_('Tài sản, tài sản ròng và tiền giữ hộ', function () {
   eq_(netWorth_().assets, nw3.assets, 'đảo bán trả lại tài sản');
 });
 
+test_('Xoá tài sản: chỉ xoá được khi chưa có giao dịch, có giao dịch rồi thì chỉ ẩn', function () {
+  var m = asUser_(T_EMAIL_1);
+  var a = createAsset_(m, { asset_type: 'other', name: 'Tài sản thử xoá', purchase_value: 1000000, purchase_date: T_D });
+  eq_(assetsView_().assets.filter(function (x) { return x.asset_id === a.asset_id; })[0].has_txn, false, 'chưa có giao dịch');
+  deleteAsset_(m, { asset_id: a.asset_id });
+  eq_(readAll_('Assets').filter(function (x) { return x.asset_id === a.asset_id; }).length, 0, 'đã xoá khỏi sheet Assets');
+  var b = createAsset_(m, { asset_type: 'other', name: 'Tài sản thử xoá 2', purchase_value: 2000000, purchase_date: T_D });
+  inc_(m, 'W001', 5000000);
+  postOne_(m, { kind: 'asset_purchase', date: T_D, amount: 2000000, wallet_id: 'W001', asset_id: b.asset_id });
+  eq_(assetsView_().assets.filter(function (x) { return x.asset_id === b.asset_id; })[0].has_txn, true, 'đã có giao dịch mua');
+  throws_(function () { deleteAsset_(m, { asset_id: b.asset_id }); }, 'ASSET', 'không xoá được vì đã có giao dịch');
+  updateAsset_(m, { asset_id: b.asset_id, active: 0 });
+  eq_(readAll_('Assets').filter(function (x) { return x.asset_id === b.asset_id; })[0].active, 0, 'vẫn ẩn được bình thường');
+});
+
 test_('Mua tài sản trừ ví nhưng không tính là chi tiêu', function () {
   var m = asUser_(T_EMAIL_1);
   var a = createAsset_(m, { asset_type: 'car', name: 'Xe thử', purchase_value: 600000000, purchase_date: '2025-01-22' });

@@ -61,6 +61,7 @@ function createMocks(opts = {}) {
     getName() { return this.name; }
     getMaxRows() { return this.maxRows; }
     insertRowsAfter(pos, n) { this.maxRows += n; }
+    deleteRow(rowNum) { this.data.splice(rowNum - 1, 1); this.maxRows = Math.max(this.maxRows - 1, 0); }
     setFrozenRows() {}
     protect() { const p = { setWarningOnly() { return p; }, setDescription() { return p; } }; return p; }
     getLastRow() {

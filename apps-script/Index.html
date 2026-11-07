@@ -613,7 +613,8 @@ function renderAdd(){
     var as=S.view.assets.assets.filter(function(a){return a.active===1&&(kind==='asset_purchase'||!a.sold);});
     if(!as.length){ form.append(h('div',{class:'empty',text:'Chưa có tài sản. Thêm ở tab Tài sản.'})); payload=null; }
     else{
-      var asel=selectEl(as.map(function(a){return {v:a.asset_id,t:a.name};}),'','asset'), wal5=walletField('','wal5');
+      var preset=S.view.addPresetAsset||''; S.view.addPresetAsset=null;
+      var asel=selectEl(as.map(function(a){return {v:a.asset_id,t:a.name};}),preset,'asset'), wal5=walletField('','wal5');
       form.append(fld(kind==='asset_purchase'?'Số tiền thanh toán':'Số tiền thu về',amt),fld('Tài sản',asel),fld(kind==='asset_purchase'?'Trả từ ví':'Nhận vào ví',wal5),h('div',{class:'hint',text:kind==='asset_purchase'?'Mua tài sản trừ tiền ví nhưng không tính là chi tiêu.':'Bán tài sản được ghi nhận là thu nhập.'}),fld('Ngày',date),fld('Ghi chú',note));
       payload=function(){ return {date:date.value,amount:amt.getNumber(),wallet_id:wal5.value,asset_id:asel.value,note:note.value,key:key}; };
     }
@@ -866,7 +867,7 @@ function renderAssetsTab(){
       h('div',{class:'sub'},[h('span',{text:'Tiền '+fmt(s.cash)}),h('span',{text:'Tiết kiệm '+fmt(s.savings)}),h('span',{text:'Tài sản '+fmt(s.assets)}),h('span',{text:'Nợ '+fmt(s.liabilities)})])]));
     var ac=h('div',{class:'card'});
     if(!a.assets.length)ac.appendChild(h('div',{class:'empty',text:'Chưa có tài sản.'}));
-    a.assets.forEach(function(x){ ac.appendChild(h('div',{class:'row',style:(x.sold||!x.active)?'opacity:.55':null},[h('div',{class:'l'},[h('div',{class:'t',text:x.name}),h('div',{class:'s',text:x.type_label+(x.sold?' · đã bán':'')+(x.purchase_date?' · '+dmy(x.purchase_date):'')})]),h('div',{class:'r',text:fmt(x.purchase_value)})])); });
+    a.assets.forEach(function(x){ ac.appendChild(h('button',{class:'tap',type:'button',style:(x.sold||!x.active)?'opacity:.55':null,onclick:function(){assetSheet(x);}},[h('div',{class:'row'},[h('div',{class:'l'},[h('div',{class:'t',text:x.name}),h('div',{class:'s',text:x.type_label+(x.sold?' · đã bán':'')+(!x.active?' · đã ẩn':'')+(x.purchase_date?' · '+dmy(x.purchase_date):'')})]),h('div',{class:'r',text:fmt(x.purchase_value)})])])); });
     kids.push(ac,h('button',{class:'btn primary block',type:'button',text:'Thêm tài sản',onclick:assetForm}));
     kids.push(h('div',{class:'hint',style:'margin-top:12px',text:'Giá trị tài sản là giá mua đã nhập; hệ thống không tự định giá lại. Tiền giữ hộ không tính vào tài sản ròng.'}));
     $app.replaceChildren.apply($app,kids);
@@ -879,6 +880,30 @@ function assetForm(){
   var body=h('div',null,[fld('Loại',type),fld('Tên tài sản',name),fld('Giá trị ghi nhận (đồng)',val,'Dùng giá mua hoặc giá trị bạn thống nhất.'),fld('Ngày mua / ghi nhận',d),er,
     submitBtn('Lưu tài sản',function(){ return api('createAsset',{asset_type:type.value,name:name.value,purchase_value:val.getNumber(),purchase_date:d.value||S.boot.today}).then(function(){sh.close();invalidateCache();toast('Đã thêm tài sản');renderAssetsTab();}); },er)]);
   sh=openSheet('Thêm tài sản',body);
+}
+function assetSheet(x){
+  var sh,b=h('div',null,[h('div',{class:'row'},[h('span',{class:'s',text:'Loại'}),h('span',{text:x.type_label})]),h('div',{class:'row'},[h('span',{class:'s',text:'Giá trị ghi nhận'}),h('strong',{text:fmt(x.purchase_value)})]),h('div',{class:'row'},[h('span',{class:'s',text:'Trạng thái'}),h('span',{text:x.sold?'Đã bán':(x.active?'Đang theo dõi':'Đã ẩn')})])]);
+  var actions=h('div',{style:'display:flex;flex-direction:column;gap:8px;margin-top:12px'});
+  actions.append(h('button',{class:'btn block',type:'button',text:'Sửa thông tin',onclick:function(){sh.close();assetEditForm(x);}}));
+  if(!x.sold)actions.append(h('button',{class:'btn primary block',type:'button',text:'Bán tài sản',onclick:function(){sh.close();S.view.addKind='asset_sale';S.view.addKey=null;S.view.addPresetAsset=x.asset_id;S.view.assets=null;go('add');}}));
+  if(!x.sold)actions.append(h('button',{class:'btn block',type:'button',text:x.active?'Ẩn tài sản':'Hiện lại tài sản',onclick:function(){ return api('updateAsset',{asset_id:x.asset_id,active:x.active?0:1}).then(function(){sh.close();invalidateCache();toast(x.active?'Đã ẩn tài sản':'Đã hiện lại tài sản');renderAssetsTab();}); }}));
+  if(!x.has_txn)actions.append(h('button',{class:'btn danger block',type:'button',text:'Xoá tài sản',onclick:function(){sh.close();assetDeleteConfirm(x);}}));
+  else actions.append(h('div',{class:'hint',text:'Tài sản đã có giao dịch mua/bán nên không xoá được, chỉ có thể ẩn.'}));
+  b.appendChild(actions);
+  sh=openSheet(x.name,b);
+}
+function assetEditForm(x){
+  var name=h('input',{id:'aen',maxlength:'120'}), val=moneyInput(x.purchase_value,'aev'), note=h('input',{id:'aenote',maxlength:'300'}), er=errBox(), sh;
+  name.value=x.name; note.value=x.note||'';
+  var body=h('div',null,[fld('Tên tài sản',name),fld('Giá trị ghi nhận (đồng)',val),fld('Ghi chú',note),er,
+    submitBtn('Lưu',function(){ return api('updateAsset',{asset_id:x.asset_id,name:name.value,purchase_value:val.getNumber(),note:note.value}).then(function(){sh.close();invalidateCache();toast('Đã lưu');renderAssetsTab();}); },er)]);
+  sh=openSheet('Sửa: '+x.name,body);
+}
+function assetDeleteConfirm(x){
+  var er=errBox(),sh;
+  var body=h('div',null,[h('div',{class:'hint',text:'Tài sản "'+x.name+'" chưa có giao dịch nào, xoá sẽ không ảnh hưởng số liệu khác. Không thể hoàn tác.'}),er,
+    submitBtn('Xoá tài sản',function(){ return api('deleteAsset',{asset_id:x.asset_id}).then(function(){sh.close();invalidateCache();toast('Đã xoá tài sản');renderAssetsTab();}); },er)]);
+  sh=openSheet('Xoá: '+x.name,body);
 }
 
 /* Khoản vay — tab riêng trên sidebar/điều hướng chính (tách khỏi "Tài sản"). */
