@@ -94,11 +94,18 @@ Phần mềm **Claude Desktop** chính bạn đang dùng để làm việc với
 
 ## 4. Tài liệu dự án — đã chuẩn bị sẵn, bạn chỉ cần copy
 
-Claude đã gom toàn bộ tài liệu cần thiết vào một thư mục trên `D:\FAMILY_FINANCES\` (xem thông báo cuối cuộc trò chuyện để biết tên thư mục chính xác). Bạn chỉ cần:
+Claude đã gom toàn bộ tài liệu cần thiết vào:
 
-1. Mở File Explorer.
-2. Copy toàn bộ nội dung thư mục đó.
+```
+D:\FAMILY_FINANCES\04_SETUP_SUPABASE_MOI\
+```
+
+(Đặt tạm trong `D:\FAMILY_FINANCES` vì đó là thư mục duy nhất đang được cấp quyền truy cập cho phiên làm việc này — không phải vì nó thuộc dự án cũ.) Bạn chỉ cần:
+
+1. Mở File Explorer, vào `D:\FAMILY_FINANCES\04_SETUP_SUPABASE_MOI\`.
+2. Copy toàn bộ nội dung (chọn hết file + thư mục `docs` bên trong, Ctrl+C).
 3. Dán (Paste) vào `D:\FAMILY_FINANCE_SUPABASE\` (thư mục vừa tạo ở Mục 1).
+4. (Tuỳ chọn) Sau khi copy xong, có thể xoá thư mục `04_SETUP_SUPABASE_MOI` để dọn lại `D:\FAMILY_FINANCES` gọn như cũ.
 
 Sau khi copy, `D:\FAMILY_FINANCE_SUPABASE\` sẽ có:
 - `CLAUDE.md` — nguyên tắc chủ đạo của dự án (Claude sẽ tự đọc file này đầu tiên).
