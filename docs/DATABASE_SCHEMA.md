@@ -151,6 +151,40 @@ Lãi suất theo từng thời điểm — **chỉ để theo dõi, không dùng
 | note | t | |
 | created_at | t | |
 
+## GoldLots
+Sổ vàng riêng — nhiều lô mua/bán độc lập, tách khỏi `Assets` (asset_type `gold` của Assets không dùng cho vàng nữa). Việc mua/bán thật sự (trừ/cộng ví) nằm ở `Transactions`/`Entries` (txn_kind `gold_purchase`/`gold_sale`, `ref_id` = lot_id) — giống hệt mô hình Assets: tạo lô chỉ lưu metadata, không tự tạo giao dịch. "Đã bán" suy ra từ có `gold_sale` chưa bị đảo cho lot_id đó, không lưu cột riêng. Thêm 07/11/2026.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| lot_id | t | |
+| brand | t | Thương hiệu / nơi mua |
+| quantity | n | Số chỉ, cho phép số thập phân |
+| purchase_value | n | Giá mua (đồng); có thể = 0 nếu được tặng/không rõ giá — khi đó không cần giao dịch ví |
+| purchase_date | t | |
+| note | t | |
+| active | n | |
+| source_ref | t | Mã chống trùng khi nhập dữ liệu cũ (`imp:gold:<ID cũ>`), rỗng với lô tạo tay |
+
+## WeddingGifts
+Sổ cưới — sổ lưu trữ thuần (quyết định 07/11/2026): **không tạo giao dịch nào**, không ảnh hưởng ví/dòng tiền gia đình. `side`: `Anh` (bên chú rể) | `Em` (bên cô dâu). `repaid` = đã trả lễ lại (đáp lễ) hay chưa, chỉ để đánh dấu. Sửa/xoá tự do (không qua cơ chế khoá xoá kiểu Assets/GoldLots vì không có giao dịch sổ cái nào gắn với nó). Thêm 07/11/2026.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| gift_id | t | |
+| wedding_date | t | |
+| side | t | `Anh` \| `Em` |
+| guest_name | t | Tên khách / gia đình (cột "Gia đình" trong Excel gốc) |
+| address | t | |
+| cash_amount | n | Tiền mừng (đồng) |
+| gold_amount | n | Vàng (chỉ), cho phép số thập phân |
+| usd_amount | n | USD |
+| relationship | t | Mối quan hệ (tự do, không phải danh mục cố định) |
+| payment_method | t | Hình thức (Tiền mặt/Chuyển khoản/Vàng…) |
+| repaid | n | 1 = đã trả lễ lại |
+| note | t | |
+| active | n | |
+| source_ref | t | Mã chống trùng khi nhập dữ liệu cũ (`imp:wedding:<STT cũ>`), rỗng với dòng tạo tay |
+
 ## Debts
 Sổ nợ cá nhân (vay mượn người quen) — khác `Liabilities` (nợ ngân hàng). Không có cột số dư: số dư còn nợ luôn tính từ `DebtEntries`, bắt đầu từ 0 (xem Ledger bên dưới).
 

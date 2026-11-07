@@ -61,6 +61,21 @@ Bổ sung/ghi đè một phần quyết định 06/11/2026 trong `DATA_MIGRATION
 - **Thuê xe** (3 dòng, 4,68tr): chi tiêu thường, danh mục "Xe và di chuyển". [ĐÃ DUYỆT 07/11/2026]
 - **Vending**: Chi 1 dòng (20tr, "máy bán nước") = mua máy → **mua tài sản**, Tài sản "Máy bán nước tự động" (loại Khác). Thu 11 dòng (20,52tr, tiền xu/doanh thu hằng tháng) = thu nhập vận hành → danh mục thu nhập mới "Thu nhập Vending" (giữ nguyên như quyết định 06/11/2026, không đổi). [ĐÃ DUYỆT 07/11/2026]
 
+## Vàng — quyết định 07/11/2026
+- Sổ vàng riêng (`GoldLots`), nhiều lô mua/bán độc lập — không dùng chung với `Assets` nữa (loại "Vàng" của Assets vẫn tồn tại trong code nhưng không dùng). [ĐÃ DUYỆT]
+- Mua/bán vàng **có liên kết Ví**, giống hệt mô hình Tài sản: mua trừ ví nhưng không tính chi tiêu; bán cộng ví và tính thu nhập; một lô chỉ bán được 1 lần (bán nguyên lô, không bán lẻ theo chỉ). [ĐÃ DUYỆT]
+- Lô vàng được tặng/nhận (vd từ đám cưới)/không rõ giá: tạo với giá mua = 0đ, ghi chú nguồn gốc, **không cần giao dịch ví nào** (hệ thống không cho giao dịch 0đ). [ĐÃ DUYỆT]
+- Vàng đang giữ (lô active, chưa bán) cộng vào **Tài sản ròng** theo giá mua đã nhập, cùng triết lý "không tự định giá lại" đã áp dụng cho Tài sản. [GIẢ ĐỊNH — theo đúng quy tắc đã duyệt cho Assets, có thể điều chỉnh nếu không đúng ý]
+- Xoá lô: chỉ xoá được khi lô chưa có giao dịch mua/bán nào; có giao dịch rồi thì chỉ ẩn — giống Tài sản. [ĐÃ DUYỆT]
+- Dữ liệu lịch sử (sheet `gold`, 9 lô, chưa từng nhập ở bất kỳ import nào trước đây — xem `DATA_MIGRATION.md`): 5 lô không rõ giá mua (0đ, ghi chú nguồn gốc) + 4 lô có giá rõ (tổng 60.415.000đ, mua năm 2024). Người dùng xác nhận 07/11/2026: 4 khoản này **chưa từng được ghi vào sổ giao dịch chính**, nên tạo thêm 1 giao dịch "Mua vàng" cho mỗi lô, trừ từ ví **Vietinbank - Cục Thịt**. [ĐÃ DUYỆT 07/11/2026]
+
+## Sổ cưới — quyết định 07/11/2026
+- **Sổ lưu trữ thuần**: không tạo giao dịch thu nhập, không ảnh hưởng ví/dòng tiền gia đình dưới bất kỳ hình thức nào — kể cả khi nhập 487 dòng lịch sử. [ĐÃ DUYỆT]
+- Mỗi dòng có thể vừa có Tiền mừng (đồng) vừa có Vàng (chỉ) vừa có USD cùng lúc (hiếm, 3/487 dòng nguồn). Dòng chỉ ghi tên khách mà không rõ số tiền mừng (95/487 dòng nguồn) vẫn được lưu — không bỏ dữ liệu lịch sử. [ĐÃ DUYỆT]
+- Cột "Đã trả" trong sổ gốc → trường `repaid`: nghĩa là **đã trả lễ lại (đáp lễ)** cho khách đó ở dịp khác, không liên quan đến việc đã nhận tiền mừng hay chưa. [ĐÃ DUYỆT, theo xác nhận của người dùng]
+- Sửa/xoá tự do, không qua cơ chế "chỉ ẩn khi đã có giao dịch" của Tài sản/Vàng — vì sổ cưới không có giao dịch sổ cái nào gắn với nó để mà khoá. [ĐÃ DUYỆT]
+- Dữ liệu lịch sử (sheet `wedding`, 487 dòng, 2 đám cưới 30/12/2022 và 11/02/2023, chưa từng nhập ở bất kỳ import nào trước đây): nhập toàn bộ, tổng 213.279.111đ + 12,2 chỉ vàng + 300 USD, không tạo giao dịch nào đi kèm. [ĐÃ DUYỆT 07/11/2026]
+
 ## Ngân sách
 - Theo tháng, số tiền cố định theo lọ; tháng mới sao chép từ tháng gần nhất trước đó. [ĐÃ DUYỆT]
 - Chỉ sửa được tháng hiện tại và tương lai; tháng đã qua giữ nguyên. Mọi thay đổi có nhật ký.

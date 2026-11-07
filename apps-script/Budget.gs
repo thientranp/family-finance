@@ -20,13 +20,13 @@ function jarEffect_(t, txnMap) {
   return 0;
 }
 
-// Signed contribution to recognised income (income and asset sales).
+// Signed contribution to recognised income (income, asset sales, gold sales).
 function incomeEffect_(t, txnMap) {
   var k = t.txn_kind;
-  if (k === 'income' || k === 'asset_sale') return t.amount;
+  if (k === 'income' || k === 'asset_sale' || k === 'gold_sale') return t.amount;
   if (k === 'reversal') {
     var o = txnMap[t.reverses_id];
-    if (o && (o.txn_kind === 'income' || o.txn_kind === 'asset_sale')) return -t.amount;
+    if (o && (o.txn_kind === 'income' || o.txn_kind === 'asset_sale' || o.txn_kind === 'gold_sale')) return -t.amount;
   }
   return 0;
 }

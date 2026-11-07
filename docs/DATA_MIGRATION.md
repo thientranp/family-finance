@@ -1,6 +1,18 @@
 # Nhập dữ liệu lịch sử (Appsheet_Finance.xlsx)
 
-File gốc **không bao giờ bị sửa** (chỉ đọc). Phạm vi: sheet `finance` (4.504 dòng, 01/12/2022–07/08/2025) và `change` (369 dòng chuyển ví). Các sheet `setting`, `report`, `event`, `saving`, `gold`, `wedding`, `cheppy_newborn` **chưa nhập** (không phải giao dịch; cần quyết định riêng).
+File gốc **không bao giờ bị sửa** (chỉ đọc). Phạm vi chính: sheet `finance` (4.504 dòng, 01/12/2022–07/08/2025) và `change` (369 dòng chuyển ví). Các sheet `setting`, `report`, `event`, `saving`, `cheppy_newborn` **chưa nhập** (không phải giao dịch; cần quyết định riêng khi cần). `gold` (9 dòng) và `wedding` (487 dòng) đã có quyết định và đã nhập xong — xem mục riêng ngay dưới đây.
+
+## Vàng + Sổ cưới — ĐÃ QUYẾT ĐỊNH VÀ NHẬP (07/11/2026)
+
+Xem đầy đủ quy tắc ở `BUSINESS_RULES.md` mục "Vàng" / "Sổ cưới". Code nhập: `ImportGoldWedding.gs` (`FF_GOLD_SEED` 9 dòng, `FF_WEDDING_SEED` 487 dòng, lấy trực tiếp từ sheet `gold`/`wedding` gốc, đối chiếu khớp tổng tiền/số lượng với nguồn). Chống trùng theo `source_ref` (`imp:gold:<ID cũ>` / `imp:wedding:<STT cũ>`) — chạy lại không nhân đôi.
+
+Quy trình (chạy MỘT LẦN trong Apps Script Editor, sau khi đã `clasp push` bản mới nhất):
+1. `importGoldWeddingDryRun()` — xem báo cáo đối chiếu (9 lô / 26 chỉ / 60.415.000đ; 487 dòng / 213.279.111đ / 12,2 chỉ / 300 USD), không ghi gì.
+2. Kiểm tra số liệu khớp đúng như trên.
+3. `importGoldWedding()` — ghi thật: 9 lô vàng + 4 giao dịch "Mua vàng" (trừ ví **Vietinbank - Cục Thịt**, cho 4 lô có giá mua rõ ràng — người dùng xác nhận các khoản này chưa từng được ghi vào sổ giao dịch chính) + 487 dòng sổ cưới (không tạo giao dịch nào).
+4. Chạy kiểm tra toàn vẹn trong app (Thêm → Hệ thống) để xác nhận không có bất thường.
+
+Đã kiểm thử đầy đủ trên máy giả lập với đúng 9 dòng vàng + 487 dòng sổ cưới lấy từ `Appsheet_Finance.xlsx` thật (không lưu dữ liệu thật lên GitHub, chỉ lưu trong `ImportGoldWedding.gs` vì đây là thông tin đã được phép đưa vào code) — đối chiếu khớp tuyệt đối, chạy lại không nhân đôi (xem `Tests.gs`).
 
 ## Nguyên tắc
 - Dữ liệu cũ là **lịch sử để báo cáo**: ngày nhập trước ngày bắt đầu của ví (01/11/2026) nên **không làm thay đổi số dư hiện tại**.

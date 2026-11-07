@@ -169,6 +169,7 @@ function liabilityBalances_() {
 }
 
 // Net worth = wallets (excluding held-in-trust) + assets at purchase price (not sold, active)
+// + gold lots at purchase price (not sold, active, see Gold.gs)
 // + personal receivables (nợ cá nhân người khác còn nợ gia đình) - liabilities (bank loans +
 // personal payables, nợ cá nhân gia đình còn nợ người khác). Treating personal lend/borrow as a
 // standard receivable/payable is the ordinary accounting default; flag it to the user if they'd
@@ -187,6 +188,10 @@ function netWorth_() {
   readAll_('Assets').forEach(function (a) {
     if (a.active === 1 && !st.assetSale[a.asset_id]) assets += a.purchase_value;
   });
+  // Vàng (sổ riêng, xem Gold.gs) tính vào "tài sản" của tài sản ròng giống Assets — giá mua đã nhập,
+  // không tự định giá lại. [GIẢ ĐỊNH — theo cùng quy tắc đã duyệt cho Assets, có thể điều chỉnh nếu
+  // không đúng ý]
+  assets += goldHoldingsValue_(st);
   var bankDebt = 0;
   Object.keys(st.liabs).forEach(function (id) { bankDebt += st.liabBal[id]; });
   var receivable = 0, payable = 0;

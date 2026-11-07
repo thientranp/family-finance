@@ -13,6 +13,8 @@ var FF_KINDS = {
   liability_adjustment: 'Điều chỉnh dư nợ',
   asset_purchase: 'Mua tài sản',
   asset_sale: 'Bán tài sản',
+  gold_purchase: 'Mua vàng',
+  gold_sale: 'Bán vàng',
   debt_lend: 'Cho vay',
   debt_borrow: 'Vay nợ',
   debt_collect: 'Thu nợ',
@@ -26,7 +28,7 @@ var FF_KINDS = {
 function buildState_() {
   var st = {
     wallets: {}, liabs: {}, debts: {}, txnMap: {}, entriesBy: {}, lentriesBy: {}, dentriesBy: {},
-    reversedBy: {}, keyMap: {}, assetSale: {}, lastHash: 'GENESIS',
+    reversedBy: {}, keyMap: {}, assetSale: {}, goldSale: {}, lastHash: 'GENESIS',
     walletBal: {}, liabBal: {}, debtBal: {}, txnList: readAll_('Transactions')
   };
   readAll_('Wallets').forEach(function (w) { st.wallets[w.wallet_id] = w; st.walletBal[w.wallet_id] = w.opening_balance || 0; });
@@ -43,6 +45,7 @@ function buildState_() {
   });
   st.txnList.forEach(function (t) {
     if (t.txn_kind === 'asset_sale' && !st.reversedBy[t.txn_id]) st.assetSale[t.ref_id] = t.txn_id;
+    if (t.txn_kind === 'gold_sale' && !st.reversedBy[t.txn_id]) st.goldSale[t.ref_id] = t.txn_id;
   });
   readAll_('Entries').forEach(function (e) {
     (st.entriesBy[e.txn_id] = st.entriesBy[e.txn_id] || []).push(e);
@@ -103,9 +106,9 @@ function shapeIssues_(t, ents, lents, dents, orig) {
     if (ents[0].amount !== sign * amt) p.push('Dòng ví không khớp số tiền.');
   }
   switch (k) {
-    case 'income': case 'asset_sale': one(1); break;
+    case 'income': case 'asset_sale': case 'gold_sale': one(1); break;
     case 'refund': one(1); break;
-    case 'expense': case 'asset_purchase': one(-1); break;
+    case 'expense': case 'asset_purchase': case 'gold_purchase': one(-1); break;
     case 'transfer':
       if (ne !== 2 || nl !== 0 || nd !== 0) p.push('Chuyển ví cần đúng 2 dòng ví.');
       else {
@@ -226,6 +229,12 @@ function assetOrThrow_(id) {
   throw ffErr_('ASSET', 'Tài sản không tồn tại.');
 }
 
+function goldLotOrThrow_(id) {
+  var gs = readAll_('GoldLots');
+  for (var i = 0; i < gs.length; i++) if (gs[i].lot_id === id) return gs[i];
+  throw ffErr_('GOLD', 'Lô vàng không tồn tại.');
+}
+
 // Validates a request and returns {plan} or {duplicate:true, txn_id}. Mutates st.
 function planPost_(st, memberId, spec) {
   var k = spec.kind;
@@ -240,7 +249,7 @@ function planPost_(st, memberId, spec) {
     balance_before: null, balance_after: null, reverses_id: '', ref_id: '', idempotency_key: key,
     entry_count: 0, created_by: memberId, created_at: nowIso_(), prev_hash: '', row_hash: ''
   };
-  var ents = [], lents = [], dents = [], orig = null, cat, w, w2, jar, liab, asset, debt;
+  var ents = [], lents = [], dents = [], orig = null, cat, w, w2, jar, liab, asset, gold, debt;
 
   switch (k) {
     case 'income':
@@ -321,6 +330,15 @@ function planPost_(st, memberId, spec) {
       if (k === 'asset_sale' && st.assetSale[asset.asset_id]) throw ffErr_('ASSET', 'Tài sản này đã được bán.');
       t.ref_id = asset.asset_id;
       ents.push({ wallet_id: w.wallet_id, amount: k === 'asset_purchase' ? -t.amount : t.amount });
+      break;
+
+    case 'gold_purchase': case 'gold_sale':
+      t.amount = amount_(spec.amount);
+      gold = goldLotOrThrow_(spec.lot_id);
+      w = activeWallet_(st, spec.wallet_id);
+      if (k === 'gold_sale' && st.goldSale[gold.lot_id]) throw ffErr_('GOLD', 'Lô vàng này đã được bán.');
+      t.ref_id = gold.lot_id;
+      ents.push({ wallet_id: w.wallet_id, amount: k === 'gold_purchase' ? -t.amount : t.amount });
       break;
 
     case 'debt_lend': case 'debt_borrow':
@@ -408,6 +426,8 @@ function planPost_(st, memberId, spec) {
   dRows.forEach(function (e) { applyDentryToState_(st, e, t); });
   if (k === 'asset_sale') st.assetSale[t.ref_id] = t.txn_id;
   if (k === 'reversal' && orig.txn.txn_kind === 'asset_sale') delete st.assetSale[orig.txn.ref_id];
+  if (k === 'gold_sale') st.goldSale[t.ref_id] = t.txn_id;
+  if (k === 'reversal' && orig.txn.txn_kind === 'gold_sale') delete st.goldSale[orig.txn.ref_id];
 
   return { duplicate: false, txn_id: t.txn_id, plan: { txn: t, ents: eRows, lents: lRows, dents: dRows } };
 }
@@ -454,6 +474,8 @@ function svcLoanPay_(m, p) { return postOne_(m, { kind: 'loan_payment', date: p.
 function svcLoanAdjust_(m, p) { return postOne_(m, { kind: 'liability_adjustment', date: p.date || todayYmd_(), liability_id: p.liability_id, actual_balance: p.actual_balance, reason: p.reason, note: p.note, key: p.key }); }
 function svcAssetBuy_(m, p) { return postOne_(m, { kind: 'asset_purchase', date: p.date, amount: p.amount, wallet_id: p.wallet_id, asset_id: p.asset_id, note: p.note, key: p.key }); }
 function svcAssetSell_(m, p) { return postOne_(m, { kind: 'asset_sale', date: p.date, amount: p.amount, wallet_id: p.wallet_id, asset_id: p.asset_id, note: p.note, key: p.key }); }
+function svcGoldBuy_(m, p) { return postOne_(m, { kind: 'gold_purchase', date: p.date, amount: p.amount, wallet_id: p.wallet_id, lot_id: p.lot_id, note: p.note, key: p.key }); }
+function svcGoldSell_(m, p) { return postOne_(m, { kind: 'gold_sale', date: p.date, amount: p.amount, wallet_id: p.wallet_id, lot_id: p.lot_id, note: p.note, key: p.key }); }
 function svcDebtCollect_(m, p) { return postOne_(m, { kind: 'debt_collect', date: p.date, amount: p.amount, wallet_id: p.wallet_id, debt_id: p.debt_id, note: p.note, key: p.key }); }
 function svcDebtRepay_(m, p) { return postOne_(m, { kind: 'debt_repay', date: p.date, amount: p.amount, wallet_id: p.wallet_id, debt_id: p.debt_id, note: p.note, key: p.key }); }
 function svcDebtAdjust_(m, p) { return postOne_(m, { kind: 'debt_adjustment', date: p.date || todayYmd_(), debt_id: p.debt_id, actual_balance: p.actual_balance, reason: p.reason, note: p.note, key: p.key }); }

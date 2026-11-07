@@ -143,8 +143,10 @@ input.amount{font-size:1.7rem;font-weight:700;text-align:right;padding:8px 10px}
   nav button[aria-label="Ví"]{order:5}
   nav button[aria-label="Tài sản"]{order:6}
   nav button[aria-label="Khoản vay"]{order:7}
-  nav button[aria-label="Sổ nợ"]{order:8}
-  nav button[aria-label="Admin"]{order:9}
+  nav button[aria-label="Vàng"]{order:8}
+  nav button[aria-label="Sổ cưới"]{order:9}
+  nav button[aria-label="Sổ nợ"]{order:10}
+  nav button[aria-label="Admin"]{order:11}
   .sheet-bg{align-items:center;padding:20px}
   .sheet{border-radius:18px;max-width:480px;max-height:85vh}
   .grid3{grid-template-columns:repeat(3,1fr)}
@@ -239,10 +241,12 @@ var ICON={
   card:'<rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M2.5 9.5h19"/><path d="M6 14h4"/>',
   box:'<path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
   people:'<circle cx="8" cy="8" r="3.2"/><path d="M2.5 19c0-3.5 2.6-5.6 5.5-5.6s5.5 2.1 5.5 5.6"/><circle cx="17" cy="9" r="2.6"/><path d="M14.5 19c.2-2.8 1.8-4.6 4-4.6"/>',
-  filter:'<path d="M4 5h16l-6 8v6l-4-2v-4z"/>'
+  filter:'<path d="M4 5h16l-6 8v6l-4-2v-4z"/>',
+  gem:'<path d="M6 3h12l3 5-9 13L3 8z"/><path d="M3 8h18M9 3l-2 5 5 13 5-13-2-5M9 8l3 13 3-13"/>',
+  heart:'<path d="M12 20.5s-7.5-4.6-10-9.3C.5 7.8 2.7 4.5 6.1 4.5c2 0 3.4 1 5.9 3.6 2.5-2.6 3.9-3.6 5.9-3.6 3.4 0 5.6 3.3 4.1 6.7-2.5 4.7-10 9.3-10 9.3z"/>'
 };
 var WALLET_ICON={cash:'cash',bank:'bank',savings:'savings',held_in_trust:'trust'};
-var KIND_ICON={income:'up',refund:'up',asset_sale:'up',expense:'down',asset_purchase:'down',transfer:'swap',adjustment:'sliders',loan_payment:'card',liability_adjustment:'sliders',reversal:'undo',debt_lend:'down',debt_borrow:'up',debt_collect:'up',debt_repay:'down',debt_adjustment:'sliders'};
+var KIND_ICON={income:'up',refund:'up',asset_sale:'up',expense:'down',asset_purchase:'down',gold_sale:'up',gold_purchase:'down',transfer:'swap',adjustment:'sliders',loan_payment:'card',liability_adjustment:'sliders',reversal:'undo',debt_lend:'down',debt_borrow:'up',debt_collect:'up',debt_repay:'down',debt_adjustment:'sliders'};
 function iconBadge(iconKey,tone,colorHex){
   var a={class:'ibadge '+(tone||'')};
   if(colorHex)a.style='background:'+colorHex+'22;color:'+colorHex;
@@ -406,7 +410,9 @@ function renderHomeData(d){
   // Tài sản/Khoản vay chỉ có mục riêng trên sidebar desktop; trên điện thoại vào qua lối tắt này.
   kids.push(h('div',{class:'btns'},[
     h('button',{class:'btn',type:'button',text:'Tài sản',onclick:function(){go('assets');}}),
-    h('button',{class:'btn',type:'button',text:'Khoản vay',onclick:function(){go('loans');}})
+    h('button',{class:'btn',type:'button',text:'Khoản vay',onclick:function(){go('loans');}}),
+    h('button',{class:'btn',type:'button',text:'Vàng',onclick:function(){go('gold');}}),
+    h('button',{class:'btn',type:'button',text:'Sổ cưới',onclick:function(){go('wedding');}})
   ]));
 
   var subtabs=HOME_SUBTABS_BASE.concat([['debts','Sổ nợ','people']]);
@@ -516,7 +522,7 @@ function txnDetail(t){
 // "debt_settle" (thu/trả một khoản nợ có sẵn) không có chip riêng - mở từ nút
 // "Thu nợ"/"Trả nợ" ngay trên từng khoản nợ (xem debtSheet), để menu "+" gọn, không trùng ý "Sổ nợ".
 // "Thu" và "Chi" gộp vào 1 chip "Thu/Chi" — chọn chiều bằng nút gạt ngay trong phiếu (giống Sổ nợ).
-var ADD_KINDS=[['expense','Thu/Chi'],['transfer','Chuyển ví'],['adjustment','Đối soát ví'],['debt_new','Sổ nợ'],['loan_payment','Trả nợ vay'],['asset_purchase','Mua tài sản'],['asset_sale','Bán tài sản']];
+var ADD_KINDS=[['expense','Thu/Chi'],['transfer','Chuyển ví'],['adjustment','Đối soát ví'],['debt_new','Sổ nợ'],['loan_payment','Trả nợ vay'],['asset_purchase','Mua tài sản'],['asset_sale','Bán tài sản'],['gold_purchase','Mua vàng'],['gold_sale','Bán vàng']];
 // Bấm để đổi người chi, thay cho dropdown — dùng cho form "Chi".
 function memberToggle(selectedId){
   var wrap=h('div',{class:'toggle2',role:'group','aria-label':'Người chi'});
@@ -532,8 +538,10 @@ function memberToggle(selectedId){
 function renderAdd(){
   var kind=S.view.addKind||'expense';
   var needAssets=(kind==='loan_payment'||kind==='asset_purchase'||kind==='asset_sale');
+  var needGold=(kind==='gold_purchase'||kind==='gold_sale');
   var needDebts=(kind==='debt_settle');
   if(needAssets&&!S.view.assets){ loading(); api('assets').then(function(a){S.view.assets=a;renderAdd();},function(e){fail(e,renderAdd);}); return; }
+  if(needGold&&!S.view.gold){ loading(); api('goldLots').then(function(g){S.view.gold=g;renderAdd();},function(e){fail(e,renderAdd);}); return; }
   if(needDebts&&!S.view.debts){ loading(); api('debts').then(function(d){S.view.debts=d;renderAdd();},function(e){fail(e,renderAdd);}); return; }
   var key=S.view.addKey||(S.view.addKey=uid());
   var chips=h('div',{class:'chips',role:'group','aria-label':'Loại giao dịch'},ADD_KINDS.map(function(k){
@@ -625,8 +633,17 @@ function renderAdd(){
       form.append(fld(kind==='asset_purchase'?'Số tiền thanh toán':'Số tiền thu về',amt),fld('Tài sản',asel),fld(kind==='asset_purchase'?'Trả từ ví':'Nhận vào ví',wal5),h('div',{class:'hint',text:kind==='asset_purchase'?'Mua tài sản trừ tiền ví nhưng không tính là chi tiêu.':'Bán tài sản được ghi nhận là thu nhập.'}),fld('Ngày',date),fld('Ghi chú',note));
       payload=function(){ return {date:date.value,amount:amt.getNumber(),wallet_id:wal5.value,asset_id:asel.value,note:note.value,key:key}; };
     }
+  } else if(kind==='gold_purchase'||kind==='gold_sale'){
+    var gs=S.view.gold.lots.filter(function(g){return g.active===1&&(kind==='gold_purchase'||!g.sold);});
+    if(!gs.length){ form.append(h('div',{class:'empty',text:'Chưa có lô vàng. Thêm ở tab Vàng.'})); payload=null; }
+    else{
+      var presetG=S.view.addPresetGold||''; S.view.addPresetGold=null;
+      var gsel=selectEl(gs.map(function(g){return {v:g.lot_id,t:g.brand+' ('+g.quantity+' chỉ · '+dmy(g.purchase_date)+')'};}),presetG,'gold'), wal6=walletField('','wal6');
+      form.append(fld(kind==='gold_purchase'?'Số tiền thanh toán':'Số tiền thu về',amt),fld('Lô vàng',gsel),fld(kind==='gold_purchase'?'Trả từ ví':'Nhận vào ví',wal6),h('div',{class:'hint',text:kind==='gold_purchase'?'Mua vàng trừ tiền ví nhưng không tính là chi tiêu.':'Bán vàng được ghi nhận là thu nhập.'}),fld('Ngày',date),fld('Ghi chú',note));
+      payload=function(){ return {date:date.value,amount:amt.getNumber(),wallet_id:wal6.value,lot_id:gsel.value,note:note.value,key:key}; };
+    }
   }
-  var apiName={expense:'expense',income:'income',transfer:'transfer',refund:'refund',adjustment:'adjust',debt_new:'debtNew',loan_payment:'loanPay',asset_purchase:'assetBuy',asset_sale:'assetSell'}[kind];
+  var apiName={expense:'expense',income:'income',transfer:'transfer',refund:'refund',adjustment:'adjust',debt_new:'debtNew',loan_payment:'loanPay',asset_purchase:'assetBuy',asset_sale:'assetSell',gold_purchase:'goldBuy',gold_sale:'goldSell'}[kind];
   var kids=[header('Nhập giao dịch'),chips,h('div',{class:'card'},[form,err])];
   if(payload){
     kids[2].appendChild(submitBtn('Lưu giao dịch',function(){
@@ -635,7 +652,7 @@ function renderAdd(){
       if(kind==='debt_settle'){ an=(p._dir==='lend')?'debtCollect':'debtRepay'; delete p._dir; }
       return api(an,p).then(function(r){
         if(p.wallet_id)S.view.lastWallet=p.wallet_id;
-        S.view.addKey=null; S.view.assets=null;
+        S.view.addKey=null; S.view.assets=null; S.view.gold=null;
         if(kind==='debt_new'||kind==='debt_settle')S.view.debts=null;
         invalidateCache();
         toast(r.duplicate?'Giao dịch này đã được ghi trước đó':'Đã lưu giao dịch');
@@ -1002,6 +1019,147 @@ function loanRateForm(l){
   sh=openSheet('Thêm mức lãi suất',body);
 }
 
+/* Vàng — sổ riêng, nhiều lô mua/bán độc lập (tách khỏi "Tài sản"). */
+function renderGoldTab(){
+  loading();
+  api('goldLots').then(function(a){
+    S.view.gold=a;
+    var s=a.summary, kids=[header('Vàng')];
+    kids.push(h('div',{class:'card hero'},[h('div',{class:'lbl',text:'Đang giữ'}),h('div',{class:'big',text:s.total_quantity+' chỉ'}),h('div',{class:'sub'},[h('span',{text:'Giá trị ghi nhận '+fmt(s.total_value)})])]));
+    var gc=h('div',{class:'card'});
+    if(!a.lots.length)gc.appendChild(h('div',{class:'empty',text:'Chưa có lô vàng.'}));
+    a.lots.forEach(function(x){ gc.appendChild(h('button',{class:'tap',type:'button',style:(x.sold||!x.active)?'opacity:.55':null,onclick:function(){goldSheet(x);}},[h('div',{class:'row'},[h('div',{class:'l'},[h('div',{class:'t',text:x.brand}),h('div',{class:'s',text:x.quantity+' chỉ'+(x.sold?' · đã bán':'')+(!x.active?' · đã ẩn':'')+(x.purchase_date?' · '+dmy(x.purchase_date):'')})]),h('div',{class:'r',text:fmt(x.purchase_value)})])])); });
+    kids.push(gc,h('button',{class:'btn primary block',type:'button',text:'Thêm lô vàng',onclick:goldForm}));
+    kids.push(h('div',{class:'hint',style:'margin-top:12px',text:'Giá trị ghi nhận là giá mua đã nhập (0đ nếu được tặng/không rõ giá); hệ thống không tự định giá lại.'}));
+    $app.replaceChildren.apply($app,kids);
+  },function(e){fail(e,renderGoldTab);});
+}
+function goldForm(){
+  var brand=h('input',{id:'gn',maxlength:'120',placeholder:'PNJ, SJC, Tuấn Kim Long…'}), qty=h('input',{id:'gq',type:'number',min:'0.01',step:'0.01'}), val=moneyInput('','gv'), d=dateInput('','gd'), note=h('input',{id:'gnote',maxlength:'300'}), er=errBox(), sh;
+  var body=h('div',null,[fld('Thương hiệu / nơi mua',brand),fld('Số lượng (chỉ)',qty),fld('Giá mua (đồng)',val,'Để 0 nếu được tặng/không rõ giá — khi đó sẽ không cần ghi giao dịch ví.'),fld('Ngày mua / nhận',d),fld('Ghi chú',note),er,
+    submitBtn('Lưu lô vàng',function(){ return api('createGoldLot',{brand:brand.value,quantity:qty.value,purchase_value:val.getNumber(),purchase_date:d.value||S.boot.today,note:note.value}).then(function(){sh.close();invalidateCache();toast('Đã thêm lô vàng');renderGoldTab();}); },er)]);
+  sh=openSheet('Thêm lô vàng',body);
+}
+function goldSheet(x){
+  var sh,b=h('div',null,[h('div',{class:'row'},[h('span',{class:'s',text:'Số lượng'}),h('span',{text:x.quantity+' chỉ'})]),h('div',{class:'row'},[h('span',{class:'s',text:'Giá trị ghi nhận'}),h('strong',{text:fmt(x.purchase_value)})]),h('div',{class:'row'},[h('span',{class:'s',text:'Trạng thái'}),h('span',{text:x.sold?'Đã bán':(x.active?'Đang theo dõi':'Đã ẩn')})])]);
+  var actions=h('div',{style:'display:flex;flex-direction:column;gap:8px;margin-top:12px'});
+  actions.append(h('button',{class:'btn block',type:'button',text:'Sửa thông tin',onclick:function(){sh.close();goldEditForm(x);}}));
+  if(!x.sold)actions.append(h('button',{class:'btn primary block',type:'button',text:'Bán lô vàng',onclick:function(){sh.close();S.view.addKind='gold_sale';S.view.addKey=null;S.view.addPresetGold=x.lot_id;S.view.gold=null;go('add');}}));
+  if(!x.sold)actions.append(h('button',{class:'btn block',type:'button',text:x.active?'Ẩn lô vàng':'Hiện lại lô vàng',onclick:function(){ return api('updateGoldLot',{lot_id:x.lot_id,active:x.active?0:1}).then(function(){sh.close();invalidateCache();toast(x.active?'Đã ẩn lô vàng':'Đã hiện lại lô vàng');renderGoldTab();}); }}));
+  if(!x.has_txn)actions.append(h('button',{class:'btn danger block',type:'button',text:'Xoá lô vàng',onclick:function(){sh.close();goldDeleteConfirm(x);}}));
+  else actions.append(h('div',{class:'hint',text:'Lô vàng đã có giao dịch mua/bán nên không xoá được, chỉ có thể ẩn.'}));
+  b.appendChild(actions);
+  sh=openSheet(x.brand,b);
+}
+function goldEditForm(x){
+  var brand=h('input',{id:'gen',maxlength:'120'}), qty=h('input',{id:'geq',type:'number',min:'0.01',step:'0.01'}), val=moneyInput(x.purchase_value,'gev'), note=h('input',{id:'genote',maxlength:'300'}), er=errBox(), sh;
+  brand.value=x.brand; qty.value=x.quantity; note.value=x.note||'';
+  var body=h('div',null,[fld('Thương hiệu / nơi mua',brand),fld('Số lượng (chỉ)',qty),fld('Giá trị ghi nhận (đồng)',val),fld('Ghi chú',note),er,
+    submitBtn('Lưu',function(){ return api('updateGoldLot',{lot_id:x.lot_id,brand:brand.value,quantity:qty.value,purchase_value:val.getNumber(),note:note.value}).then(function(){sh.close();invalidateCache();toast('Đã lưu');renderGoldTab();}); },er)]);
+  sh=openSheet('Sửa: '+x.brand,body);
+}
+function goldDeleteConfirm(x){
+  var er=errBox(),sh;
+  var body=h('div',null,[h('div',{class:'hint',text:'Lô vàng "'+x.brand+'" chưa có giao dịch nào, xoá sẽ không ảnh hưởng số liệu khác. Không thể hoàn tác.'}),er,
+    submitBtn('Xoá lô vàng',function(){ return api('deleteGoldLot',{lot_id:x.lot_id}).then(function(){sh.close();invalidateCache();toast('Đã xoá lô vàng');renderGoldTab();}); },er)]);
+  sh=openSheet('Xoá: '+x.brand,body);
+}
+
+/* Sổ cưới — sổ lưu trữ thuần, KHÔNG tạo giao dịch, không ảnh hưởng dòng tiền. */
+function weddingFilterKey_(f){ return 'wedding:'+(f.side||'')+'|'+(f.relationship||'')+'|'+(f.repaid||'')+'|'+(f.q||''); }
+function renderWeddingTab(){
+  var f=S.view.weddingFilter=S.view.weddingFilter||{};
+  loading();
+  api('weddingGifts',f).then(function(r){ renderWeddingData(f,r); },function(e){fail(e,renderWeddingTab);});
+}
+function weddingFilterCount_(f){ var n=0; ['side','relationship','repaid','q'].forEach(function(k){if(f[k])n++;}); return n; }
+function weddingFilterSheet(f,relationships){
+  var sideOpts=[{v:'',t:'Cả hai bên'},{v:'Anh',t:'Bên chú rể (Anh)'},{v:'Em',t:'Bên cô dâu (Em)'}];
+  var side=selectEl(sideOpts,f.side||'','wfside');
+  var relOpts=[{v:'',t:'Tất cả mối quan hệ'}].concat(relationships.map(function(r){return {v:r,t:r};}));
+  var rel=selectEl(relOpts,f.relationship||'','wfrel');
+  var repaidOpts=[{v:'',t:'Tất cả'},{v:'1',t:'Đã trả lễ lại'},{v:'0',t:'Chưa trả lễ lại'}];
+  var rep=selectEl(repaidOpts,f.repaid||'','wfrep');
+  var q=h('input',{id:'wfq',type:'search',placeholder:'Tìm tên khách, địa chỉ, ghi chú',value:f.q||''});
+  var sh;
+  var body=h('div',null,[fld('Bên',side),fld('Mối quan hệ',rel),fld('Đáp lễ',rep),fld('Tìm kiếm',q),
+    h('div',{class:'btns'},[
+      h('button',{class:'btn',type:'button',text:'Xoá lọc',onclick:function(){sh.close();S.view.weddingFilter={};renderWeddingTab();}}),
+      h('button',{class:'btn primary',type:'button',text:'Áp dụng',onclick:function(){sh.close();S.view.weddingFilter={side:side.value,relationship:rel.value,repaid:rep.value,q:q.value};renderWeddingTab();}})
+    ])
+  ]);
+  sh=openSheet('Lọc sổ cưới',body);
+}
+function renderWeddingData(f,r){
+  var cnt=weddingFilterCount_(f);
+  var kids=[header('Sổ cưới')];
+  kids.push(h('div',{class:'card hero'},[h('div',{class:'lbl',text:'Tổng mừng cưới ('+r.totals.count+' khách)'}),
+    h('div',{class:'big',text:fmt(r.totals.cash)}),
+    h('div',{class:'sub'},[r.totals.gold?h('span',{text:'Vàng '+r.totals.gold+' chỉ'}):null,r.totals.usd?h('span',{text:'USD '+r.totals.usd}):null])]));
+  kids.push(h('div',{class:'filterbar'},[h('button',{class:'btn',type:'button',text:'Lọc'+(cnt?' ('+cnt+')':''),onclick:function(){weddingFilterSheet(f,r.relationships);}}),h('button',{class:'btn',type:'button',text:'Thêm khách',onclick:weddingForm})]));
+  var wc=h('div',{class:'card'});
+  if(!r.gifts.length)wc.appendChild(h('div',{class:'empty',text:'Không có dòng nào khớp bộ lọc.'}));
+  r.gifts.forEach(function(x){
+    var parts=[];
+    if(x.cash_amount)parts.push(fmt(x.cash_amount));
+    if(x.gold_amount)parts.push(x.gold_amount+' chỉ');
+    if(x.usd_amount)parts.push(x.usd_amount+' USD');
+    wc.appendChild(h('button',{class:'tap',type:'button',onclick:function(){weddingSheet(x);}},[h('div',{class:'row'},[h('div',{class:'l'},[h('div',{class:'t',text:x.guest_name}),h('div',{class:'s',text:dmy(x.wedding_date)+' · '+x.side_label+(x.relationship?' · '+x.relationship:'')+(x.repaid?' · đã trả lễ lại':'')})]),h('div',{class:'r',text:parts.join(' · ')||'—'})])]));
+  });
+  kids.push(wc);
+  $app.replaceChildren.apply($app,kids);
+}
+function weddingForm(){
+  var d=dateInput('','wd'), side=selectEl([{v:'Anh',t:'Bên chú rể (Anh)'},{v:'Em',t:'Bên cô dâu (Em)'}],'Anh','wsd');
+  var name=h('input',{id:'wn',maxlength:'160'}), addr=h('input',{id:'wa',maxlength:'160'});
+  var cash=moneyInput('','wc'), gold=h('input',{id:'wg',type:'number',min:'0',step:'0.01'}), usd=h('input',{id:'wu',type:'number',min:'0',step:'0.01'});
+  var rel=h('input',{id:'wr',maxlength:'60',placeholder:'Nội, Ngoại, Bạn bè, Hàng xóm…'}), method=h('input',{id:'wm',maxlength:'60',placeholder:'Tiền mặt, Chuyển khoản, Vàng…'});
+  var repaid=h('input',{type:'checkbox',id:'wrep'}); var repaidWrap=h('label',{style:'display:flex;align-items:center;gap:8px;min-height:44px'},[repaid,h('span',{text:'Đã trả lễ lại (đáp lễ)'})]);
+  var note=h('input',{id:'wnote',maxlength:'300'}), er=errBox(), sh;
+  var body=h('div',null,[fld('Ngày cưới',d),fld('Bên',side),fld('Tên khách / gia đình',name),fld('Địa chỉ',addr),
+    fld('Tiền mừng (đồng)',cash),fld('Vàng (chỉ)',gold),fld('USD',usd),fld('Mối quan hệ',rel),fld('Hình thức',method),repaidWrap,fld('Ghi chú',note),er,
+    submitBtn('Lưu',function(){ return api('createWeddingGift',{wedding_date:d.value||S.boot.today,side:side.value,guest_name:name.value,address:addr.value,cash_amount:cash.getNumber(),gold_amount:gold.value,usd_amount:usd.value,relationship:rel.value,payment_method:method.value,repaid:repaid.checked,note:note.value}).then(function(){sh.close();invalidateCache();toast('Đã thêm');renderWeddingTab();}); },er)]);
+  sh=openSheet('Thêm khách mừng cưới',body);
+}
+function weddingSheet(x){
+  var sh,b=h('div',null,[
+    h('div',{class:'row'},[h('span',{class:'s',text:'Ngày cưới'}),h('span',{text:dmy(x.wedding_date)+' · '+x.side_label})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'Địa chỉ'}),h('span',{text:x.address||'—'})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'Tiền mừng'}),h('strong',{text:fmt(x.cash_amount)})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'Vàng'}),h('span',{text:x.gold_amount?x.gold_amount+' chỉ':'—'})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'USD'}),h('span',{text:x.usd_amount||'—'})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'Mối quan hệ'}),h('span',{text:x.relationship||'—'})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'Hình thức'}),h('span',{text:x.payment_method||'—'})]),
+    h('div',{class:'row'},[h('span',{class:'s',text:'Đáp lễ'}),h('span',{text:x.repaid?'Đã trả lễ lại':'Chưa'})]),
+    x.note?h('div',{class:'row'},[h('span',{class:'s',text:'Ghi chú'}),h('span',{text:x.note})]):null
+  ]);
+  var actions=h('div',{style:'display:flex;flex-direction:column;gap:8px;margin-top:12px'});
+  actions.append(h('button',{class:'btn block',type:'button',text:'Sửa thông tin',onclick:function(){sh.close();weddingEditForm(x);}}));
+  actions.append(h('button',{class:'btn block',type:'button',text:x.repaid?'Bỏ đánh dấu đã trả lễ':'Đánh dấu đã trả lễ lại',onclick:function(){ return api('updateWeddingGift',{gift_id:x.gift_id,repaid:x.repaid?0:1}).then(function(){sh.close();invalidateCache();toast('Đã lưu');renderWeddingTab();}); }}));
+  actions.append(h('button',{class:'btn danger block',type:'button',text:'Xoá',onclick:function(){sh.close();weddingDeleteConfirm(x);}}));
+  b.appendChild(actions);
+  sh=openSheet(x.guest_name,b);
+}
+function weddingEditForm(x){
+  var d=dateInput(x.wedding_date,'wed'), side=selectEl([{v:'Anh',t:'Bên chú rể (Anh)'},{v:'Em',t:'Bên cô dâu (Em)'}],x.side,'wesd');
+  var name=h('input',{id:'wen',maxlength:'160'}), addr=h('input',{id:'wea',maxlength:'160'});
+  name.value=x.guest_name; addr.value=x.address||'';
+  var cash=moneyInput(x.cash_amount,'wec'), gold=h('input',{id:'weg',type:'number',min:'0',step:'0.01',value:x.gold_amount||''}), usd=h('input',{id:'weu',type:'number',min:'0',step:'0.01',value:x.usd_amount||''});
+  var rel=h('input',{id:'wer',maxlength:'60'}), method=h('input',{id:'wem',maxlength:'60'}); rel.value=x.relationship||''; method.value=x.payment_method||'';
+  var note=h('input',{id:'wenote',maxlength:'300'}); note.value=x.note||'';
+  var er=errBox(), sh;
+  var body=h('div',null,[fld('Ngày cưới',d),fld('Bên',side),fld('Tên khách / gia đình',name),fld('Địa chỉ',addr),
+    fld('Tiền mừng (đồng)',cash),fld('Vàng (chỉ)',gold),fld('USD',usd),fld('Mối quan hệ',rel),fld('Hình thức',method),fld('Ghi chú',note),er,
+    submitBtn('Lưu',function(){ return api('updateWeddingGift',{gift_id:x.gift_id,wedding_date:d.value,side:side.value,guest_name:name.value,address:addr.value,cash_amount:cash.getNumber(),gold_amount:gold.value,usd_amount:usd.value,relationship:rel.value,payment_method:method.value,note:note.value}).then(function(){sh.close();invalidateCache();toast('Đã lưu');renderWeddingTab();}); },er)]);
+  sh=openSheet('Sửa: '+x.guest_name,body);
+}
+function weddingDeleteConfirm(x){
+  var er=errBox(),sh;
+  var body=h('div',null,[h('div',{class:'hint',text:'Xoá dòng "'+x.guest_name+'" khỏi sổ cưới. Không thể hoàn tác.'}),er,
+    submitBtn('Xoá',function(){ return api('deleteWeddingGift',{gift_id:x.gift_id}).then(function(){sh.close();invalidateCache();toast('Đã xoá');renderWeddingTab();}); },er)]);
+  sh=openSheet('Xoá: '+x.guest_name,body);
+}
+
 /* Admin: Danh mục, Lọ ngân sách, Nhắc nhở — mỗi mục màn hình riêng (trước đây gộp chung). */
 function renderJars(){
   loading();
@@ -1073,8 +1231,8 @@ function renderSystem(){
 // riêng mình nhưng chỉ hiện trên sidebar desktop (CSS .side-only), không chiếm chỗ thanh dưới trên
 // điện thoại — trên điện thoại các mục này vẫn mở được qua các lối tắt ở Tổng quan.
 var TABS=[['home','Tổng quan','home'],['history','Lịch sử','list'],['add','Nhập','plus'],['budget','Ngân sách','jar'],
-  ['wallets','Ví','bank',true],['assets','Tài sản','box',true],['loans','Khoản vay','card',true],['debts','Sổ nợ','people',true],
-  ['more','Admin','gear']];
+  ['wallets','Ví','bank',true],['assets','Tài sản','box',true],['loans','Khoản vay','card',true],['gold','Vàng','gem',true],
+  ['wedding','Sổ cưới','heart',true],['debts','Sổ nợ','people',true],['more','Admin','gear']];
 function drawNav(){
   var nav=document.getElementById('nav'); nav.replaceChildren();
   TABS.forEach(function(t){
@@ -1086,7 +1244,7 @@ function drawNav(){
 }
 function go(tab){ S.tab=tab; drawNav(); window.scrollTo(0,0); refresh(); }
 function refresh(){
-  ({home:renderHome,history:renderHistory,add:renderAdd,budget:renderBudget,wallets:renderWallets,assets:renderAssetsTab,loans:renderLoansTab,debts:renderDebts,more:renderMore})[S.tab]();
+  ({home:renderHome,history:renderHistory,add:renderAdd,budget:renderBudget,wallets:renderWallets,assets:renderAssetsTab,loans:renderLoansTab,gold:renderGoldTab,wedding:renderWeddingTab,debts:renderDebts,more:renderMore})[S.tab]();
 }
 
 /* ---------- start ---------- */

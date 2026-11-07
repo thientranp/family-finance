@@ -831,6 +831,149 @@ test_('Chạy thiết lập lần đầu trên bảng tính hoàn toàn trống 
   }
 });
 
+test_('Vàng: lô mua/bán độc lập, trừ/cộng ví, không tính là chi tiêu, bán rồi tính thu nhập', function () {
+  var m = asUser_(T_EMAIL_1);
+  var nwBefore = netWorth_();
+  var g = createGoldLot_(m, { brand: 'PNJ', quantity: 2, purchase_value: 13000000, purchase_date: T_D });
+  eq_(goldLotsView_().lots.filter(function (x) { return x.lot_id === g.lot_id; })[0].has_txn, false, 'chưa có giao dịch');
+  inc_(m, 'W001', 20000000);
+  var nw0 = netWorth_();
+  eq_(nw0.assets, nwBefore.assets + 13000000, 'tạo lô đã cộng ngay vào tài sản ròng theo giá mua (độc lập với việc đã ghi giao dịch ví hay chưa)');
+  var b0 = bal_('W001'), f0 = flow_('2026-11');
+  postOne_(m, { kind: 'gold_purchase', date: T_D, amount: 13000000, wallet_id: 'W001', lot_id: g.lot_id });
+  eq_(bal_('W001'), b0 - 13000000, 'ví giảm đúng số tiền mua vàng');
+  eq_(flow_('2026-11').expense, f0.expense, 'mua vàng không tính là chi tiêu');
+  eq_(netWorth_().assets, nw0.assets, 'ghi giao dịch mua không đổi tài sản ròng (giá trị lô đã tính từ lúc tạo lô)');
+
+  var f1 = flow_('2026-11');
+  postOne_(m, { kind: 'gold_sale', date: T_D, amount: 15000000, wallet_id: 'W001', lot_id: g.lot_id });
+  eq_(bal_('W001'), b0 - 13000000 + 15000000, 'ví tăng đúng số tiền bán vàng');
+  eq_(flow_('2026-11').income, f1.income + 15000000, 'bán vàng tính là thu nhập');
+  eq_(netWorth_().assets, nwBefore.assets, 'lô đã bán không còn tính vào tài sản ròng');
+  throws_(function () { postOne_(m, { kind: 'gold_sale', date: T_D, amount: 1, wallet_id: 'W001', lot_id: g.lot_id }); }, 'GOLD', 'bán lần 2');
+
+  var sale = lastTxn_();
+  postOne_(m, { kind: 'reversal', date: T_D, txn_id: sale.txn_id, reason: 'Nhập nhầm giao dịch bán vàng' });
+  eq_(netWorth_().assets, nw0.assets, 'đảo bán trả lại lô vàng vào tài sản ròng');
+});
+
+test_('Vàng: lô giá 0 (nhận tặng/không rõ giá) không cần giao dịch ví; xoá chỉ được khi chưa có giao dịch', function () {
+  var m = asUser_(T_EMAIL_1);
+  var gift = createGoldLot_(m, { brand: 'Nhận từ đám cưới', quantity: 0.5, purchase_date: T_D, note: 'Không rõ giá mua' });
+  eq_(readAll_('GoldLots').filter(function (x) { return x.lot_id === gift.lot_id; })[0].purchase_value, 0, 'giá mua mặc định 0');
+  eq_(goldLotHasTxn_(gift.lot_id), false, 'lô giá 0 không có giao dịch nào gắn với nó');
+  deleteGoldLot_(m, { lot_id: gift.lot_id });
+  eq_(readAll_('GoldLots').filter(function (x) { return x.lot_id === gift.lot_id; }).length, 0, 'xoá được vì chưa có giao dịch');
+
+  var g = createGoldLot_(m, { brand: 'SJC', quantity: 1, purchase_value: 7000000, purchase_date: T_D });
+  inc_(m, 'W001', 10000000);
+  postOne_(m, { kind: 'gold_purchase', date: T_D, amount: 7000000, wallet_id: 'W001', lot_id: g.lot_id });
+  throws_(function () { deleteGoldLot_(m, { lot_id: g.lot_id }); }, 'GOLD', 'không xoá được vì đã có giao dịch');
+  updateGoldLot_(m, { lot_id: g.lot_id, active: 0 });
+  eq_(readAll_('GoldLots').filter(function (x) { return x.lot_id === g.lot_id; })[0].active, 0, 'vẫn ẩn được bình thường');
+});
+
+test_('Nhập lô vàng cũ từ Excel: chống trùng theo source_ref, chạy lại không nhân đôi', function () {
+  var m = asUser_(T_EMAIL_1);
+  var rows = [
+    { brand: 'Cùa', quantity: 3.5, purchase_value: 0, purchase_date: '2022-12-30', note: 'Nhận từ đám cưới', source_ref: 'imp:gold:test_unit_1' },
+    { brand: 'Tuấn Kim Long', quantity: 3.5, purchase_value: 22050000, purchase_date: '2024-01-10', source_ref: 'imp:gold:test_unit_2' }
+  ];
+  var r1 = importGoldLots_(m, { rows: rows });
+  eq_(r1.created.length, 2, 'nhập được 2 lô');
+  eq_(r1.skipped.length, 0, 'chưa có gì để bỏ qua lần đầu');
+  var r2 = importGoldLots_(m, { rows: rows });
+  eq_(r2.created.length, 0, 'chạy lại không tạo thêm');
+  eq_(r2.skipped.length, 2, 'cả 2 dòng bị bỏ qua vì đã có source_ref trùng');
+  eq_(readAll_('GoldLots').filter(function (x) { return x.source_ref === 'imp:gold:test_unit_2'; }).length, 1, 'không nhân đôi trong sheet');
+});
+
+test_('Sổ cưới: thêm/sửa/xoá, lọc & tổng hợp, KHÔNG tạo giao dịch nào (sổ lưu trữ thuần)', function () {
+  var m = asUser_(T_EMAIL_1);
+  var txnCountBefore = readAll_('Transactions').length;
+  var g1 = createWeddingGift_(m, { wedding_date: '2022-12-30', side: 'Anh', guest_name: 'Bác Ba', address: 'Quảng Ngãi', cash_amount: 4000000, relationship: 'Nội', payment_method: 'Tiền mặt' });
+  var g2 = createWeddingGift_(m, { wedding_date: '2022-12-30', side: 'Em', guest_name: 'GĐ Thanh - Nhung', address: 'Hoàn Cát', gold_amount: 0.5, relationship: 'Gia đình', payment_method: 'Vàng', repaid: true });
+  var g3 = createWeddingGift_(m, { wedding_date: '2023-02-11', side: 'Anh', guest_name: 'Mỹ', address: 'Mĩ', usd_amount: 100, relationship: 'Bạn bè', payment_method: 'Tiền mặt' });
+  eq_(readAll_('Transactions').length, txnCountBefore, 'sổ cưới không tạo bất kỳ giao dịch sổ cái nào');
+
+  var all = weddingGiftsView_({});
+  eq_(all.totals.count, 3, 'tổng số dòng');
+  eq_(all.totals.cash, 4000000, 'tổng tiền mừng');
+  eq_(all.totals.gold, 0.5, 'tổng vàng (chỉ)');
+  eq_(all.totals.usd, 100, 'tổng USD');
+
+  var golden = weddingGiftsView_({ side: 'Em' });
+  eq_(golden.totals.count, 1, 'lọc theo bên Em');
+  var repaidOnly = weddingGiftsView_({ repaid: '1' });
+  eq_(repaidOnly.totals.count, 1, 'lọc đã trả lễ lại');
+  var searched = weddingGiftsView_({ q: 'thanh' });
+  eq_(searched.totals.count, 1, 'tìm theo tên không phân biệt hoa thường');
+
+  updateWeddingGift_(m, { gift_id: g1.gift_id, cash_amount: 4500000, note: 'Sửa lại số tiền' });
+  eq_(readAll_('WeddingGifts').filter(function (x) { return x.gift_id === g1.gift_id; })[0].cash_amount, 4500000, 'sửa được số tiền');
+
+  deleteWeddingGift_(m, { gift_id: g3.gift_id });
+  eq_(readAll_('WeddingGifts').filter(function (x) { return x.gift_id === g3.gift_id; }).length, 0, 'xoá tự do (không phải sổ cái, không cần kiểm tra giao dịch)');
+  eq_(readAll_('Transactions').length, txnCountBefore, 'xoá/sửa sổ cưới vẫn không đụng tới sổ cái');
+});
+
+test_('Sổ cưới: dòng chỉ ghi tên (không rõ số tiền mừng) vẫn lưu được, không mất dữ liệu lịch sử', function () {
+  var m = asUser_(T_EMAIL_1);
+  var g = createWeddingGift_(m, { wedding_date: '2022-12-30', side: 'Em', guest_name: 'Khách không rõ tiền mừng', relationship: 'Hàng xóm' });
+  var row = readAll_('WeddingGifts').filter(function (x) { return x.gift_id === g.gift_id; })[0];
+  eq_(row.cash_amount, 0, 'mặc định 0');
+  eq_(row.gold_amount, 0, 'mặc định 0');
+  eq_(row.usd_amount, 0, 'mặc định 0');
+});
+
+test_('Nhập sổ cưới cũ từ Excel: chống trùng theo source_ref, chạy lại không nhân đôi', function () {
+  var m = asUser_(T_EMAIL_1);
+  var rows = [
+    { wedding_date: '2022-12-30', side: 'Anh', guest_name: 'Bác Ba', address: 'Quảng Ngãi', cash_amount: 4000000, relationship: 'Nội', payment_method: 'Tiền mặt', source_ref: 'imp:wedding:test_unit_1' },
+    { wedding_date: '2022-12-30', side: 'Em', guest_name: 'GĐ Thanh - Nhung', address: 'Hoàn Cát', gold_amount: 0.5, relationship: 'Gia đình', payment_method: 'Vàng', source_ref: 'imp:wedding:test_unit_4' }
+  ];
+  var r1 = importWeddingGifts_(m, { rows: rows });
+  eq_(r1.created.length, 2, 'nhập được 2 dòng');
+  var r2 = importWeddingGifts_(m, { rows: rows });
+  eq_(r2.created.length, 0, 'chạy lại không tạo thêm');
+  eq_(r2.skipped.length, 2, 'bỏ qua vì source_ref đã tồn tại');
+  eq_(readAll_('WeddingGifts').filter(function (x) { return x.source_ref === 'imp:wedding:test_unit_4'; }).length, 1, 'không nhân đôi trong sheet');
+  eq_(readAll_('Transactions').length, readAll_('Transactions').length, 'import sổ cưới không bao giờ tạo giao dịch');
+});
+
+test_('Nhập vàng + sổ cưới cũ từ Excel (ImportGoldWedding): đối chiếu khớp, chống trùng, ghi đúng giao dịch mua vàng', function () {
+  asUser_(T_EMAIL_1);
+  var dry = importGoldWeddingDryRun();
+  ok_(dry.indexOf('60.415.000') >= 0, 'dry run nêu đúng tổng giá trị vàng nguồn');
+  var txnBefore = readAll_('Transactions').length;
+  var real = importGoldWedding();
+  ok_(real.indexOf('9 lô vàng mới') >= 0, 'đã ghi đúng 9 lô vàng');
+  ok_(real.indexOf('4 giao dịch mua vàng') >= 0, 'đã ghi đúng 4 giao dịch mua vàng (4 lô có giá)');
+  ok_(real.indexOf('487 dòng sổ cưới') >= 0, 'đã ghi đúng 487 dòng sổ cưới');
+  // Chỉ đếm theo đúng source_ref có trong FF_GOLD_SEED/FF_WEDDING_SEED — môi trường test dùng chung
+  // (không cô lập) nên có thể còn vài lô/dòng nguồn giả từ các test khác ở trên.
+  function isSeedGold(g) { return FF_GOLD_SEED.some(function (s) { return s.source_ref === g.source_ref; }); }
+  function isSeedWedding(g) { return FF_WEDDING_SEED.some(function (s) { return s.source_ref === g.source_ref; }); }
+  eq_(readAll_('GoldLots').filter(isSeedGold).length, 9, 'đủ 9 lô vàng trong sheet');
+  eq_(readAll_('WeddingGifts').filter(isSeedWedding).length, 487, 'đủ 487 dòng sổ cưới trong sheet');
+  eq_(readAll_('Transactions').length, txnBefore + 4, 'chỉ 4 giao dịch mua vàng được ghi (sổ cưới không tạo giao dịch nào)');
+  var srcQty = 0; readAll_('GoldLots').filter(isSeedGold).forEach(function (g) { srcQty += g.quantity; });
+  eq_(srcQty, 26, 'tổng số lượng vàng nhập đúng 26 chỉ');
+  var srcCash = 0, srcGold = 0, srcUsd = 0;
+  readAll_('WeddingGifts').filter(isSeedWedding).forEach(function (g) { srcCash += g.cash_amount; srcGold += g.gold_amount; srcUsd += g.usd_amount; });
+  eq_(srcCash, 213279111, 'tổng tiền mừng đúng');
+  eq_(Math.round(srcGold * 10) / 10, 12.2, 'tổng vàng mừng cưới đúng');
+  eq_(srcUsd, 300, 'tổng USD mừng cưới đúng');
+
+  // chạy lại không nhân đôi
+  var r2 = importGoldWedding();
+  ok_(r2.indexOf('0 lô vàng mới') >= 0, 'chạy lại không tạo thêm lô vàng');
+  ok_(r2.indexOf('0 dòng sổ cưới') >= 0, 'chạy lại không tạo thêm dòng sổ cưới');
+  eq_(readAll_('Transactions').length, txnBefore + 4, 'chạy lại không ghi thêm giao dịch mua vàng');
+  eq_(readAll_('GoldLots').filter(isSeedGold).length, 9, 'vẫn đúng 9 lô, không nhân đôi');
+  eq_(readAll_('WeddingGifts').filter(isSeedWedding).length, 487, 'vẫn đúng 487 dòng, không nhân đôi');
+});
+
 // ---------- runner ----------
 function runAllTests() { return runTests_(null); }
 

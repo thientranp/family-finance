@@ -43,7 +43,7 @@ function listTxns_(m, f) {
   var wn = nameMap_('Wallets', 'wallet_id', 'name'), jn = nameMap_('Jars', 'jar_id', 'name'),
     cn = nameMap_('Categories', 'category_id', 'name'), mn = nameMap_('Members', 'member_id', 'display_name'),
     ln = nameMap_('Liabilities', 'liability_id', 'name'), an = nameMap_('Assets', 'asset_id', 'name'),
-    dn = nameMap_('Debts', 'debt_id', 'counterparty');
+    gn = nameMap_('GoldLots', 'lot_id', 'brand'), dn = nameMap_('Debts', 'debt_id', 'counterparty');
   mn.FAMILY = 'Cả gia đình';
   var q = f.q ? String(f.q).toLowerCase() : '';
   var out = [];
@@ -68,7 +68,7 @@ function listTxns_(m, f) {
       debt_lines: (lentBy[t.txn_id] || []).map(function (e) { return { liability: ln[e.liability_id] || e.liability_id, amount: e.amount }; })
         .concat((dentBy[t.txn_id] || []).map(function (e) { return { liability: dn[e.debt_id] || e.debt_id, amount: e.amount }; })),
       jar: jn[t.jar_id] || '', category: cn[t.category_id] || '', paid_by: mn[t.paid_by] || '', beneficiary: mn[t.beneficiary] || '',
-      ref: ln[t.ref_id] || an[t.ref_id] || dn[t.ref_id] || '', note: t.note, reason: t.reason, balance_before: t.balance_before, balance_after: t.balance_after,
+      ref: ln[t.ref_id] || an[t.ref_id] || gn[t.ref_id] || dn[t.ref_id] || '', note: t.note, reason: t.reason, balance_before: t.balance_before, balance_after: t.balance_after,
       reverses_id: t.reverses_id, reversed: !!reversedBy[t.txn_id],
       reversible: t.txn_kind !== 'reversal' && !reversedBy[t.txn_id],
       created_by: mn[t.created_by] || '', created_at: t.created_at

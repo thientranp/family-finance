@@ -29,6 +29,20 @@ var FF_SCHEMA = {
   // Không có cột số dư/opening_balance ở đây: số dư còn nợ luôn tính từ DebtEntries (bắt đầu từ 0, bắt đầu nợ thì đi kèm bút toán debt_lend/debt_borrow) để tránh ghi trùng và để đảo được bút toán một cách nhất quán.
   Debts: 'debt_id:t,direction:t,counterparty:t,original_amount:n,opening_date:t,note:t',
   DebtEntries: 'entry_id:t,txn_id:t,debt_id:t,amount:n',
+  // Sổ vàng riêng (các lô mua/bán độc lập, KHÔNG dùng chung với asset_type='gold' của Assets).
+  // quantity = số chỉ (cho phép số thập phân, không phải tiền nên không qua toNumber_).
+  // purchase_value có thể = 0 (vàng được tặng/nhận từ đám cưới, không rõ giá) — khi đó KHÔNG có
+  // giao dịch ví nào gắn với lô (xem createGoldLot_/svcGoldBuy_). Thông tin bán (giá/ngày) không lưu
+  // ở đây — suy ra từ giao dịch gold_sale (ref_id=lot_id), giống cách Assets suy ra "đã bán".
+  // source_ref: mã chống trùng khi nhập dữ liệu cũ từ Excel (vd "imp:gold:<ID cũ>"), rỗng với lô tạo
+  // tay qua UI — dùng để importGoldLots_ chạy lại nhiều lần không bị nhân đôi.
+  GoldLots: 'lot_id:t,brand:t,quantity:n,purchase_value:n,purchase_date:t,note:t,active:n,source_ref:t',
+  // Sổ cưới — sổ lưu trữ thuần, KHÔNG tạo giao dịch thu nhập / không ảnh hưởng dòng tiền gia đình
+  // (quyết định 07/11/2026). side: 'Anh'|'Em' (bên nào mời khách này). repaid = đã trả lễ lại (đáp
+  // lễ) hay chưa — chỉ để đánh dấu, không có nghiệp vụ tài chính nào đi kèm.
+  // source_ref: mã chống trùng khi nhập dữ liệu cũ từ Excel (vd "imp:wedding:<STT cũ>"), rỗng với
+  // dòng tạo tay qua UI — dùng để importWeddingGifts_ chạy lại nhiều lần không bị nhân đôi.
+  WeddingGifts: 'gift_id:t,wedding_date:t,side:t,guest_name:t,address:t,cash_amount:n,gold_amount:n,usd_amount:n,relationship:t,payment_method:t,repaid:n,note:t,active:n,source_ref:t',
   Reminders: 'reminder_id:t,type:t,title:t,day_of_month:n,days_before:n,ref_id:t,active:n',
   Notifications: 'key:t,created_at:t,to:t,subject:t,status:t,attempts:n,last_error:t',
   AuditLog: 'ts:t,actor:t,action:t,ref_id:t,details:t',
@@ -223,6 +237,15 @@ function pct_(v, label, max) {
   var n = Number(v);
   if (!isFinite(n)) throw ffErr_('AMOUNT', (label || 'Giá trị') + ' không hợp lệ.');
   if (n < 0 || n > (max === undefined ? 100 : max)) throw ffErr_('AMOUNT', (label || 'Giá trị') + ' không hợp lệ.');
+  return n;
+}
+
+// Decimal number > 0 — for non-money quantities (e.g. số chỉ vàng), where toNumber_'s
+// "integer đồng only" rule doesn't apply and 0 is not a valid quantity (unlike pct_).
+function qty_(v, label, max) {
+  if (v === '' || v === null || v === undefined) throw ffErr_('AMOUNT', (label || 'Số lượng') + ' không được để trống.');
+  var n = Number(v);
+  if (!isFinite(n) || n <= 0 || n > (max === undefined ? 100000 : max)) throw ffErr_('AMOUNT', (label || 'Số lượng') + ' không hợp lệ.');
   return n;
 }
 
