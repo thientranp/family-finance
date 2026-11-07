@@ -119,10 +119,12 @@ Mỗi giai đoạn kết thúc bằng: danh sách file thay đổi, kết quả 
 - **Xong khi:** dư nợ sau kỳ đúng; tài sản ròng đúng công thức; sự kiện tự gắn đúng người, không ảnh hưởng người khác; test tương đương 53 test cũ đạt.
 
 ### Giai đoạn 6 — Di chuyển dữ liệu từ Google Sheets
-- Script đọc trực tiếp từng sheet hiện tại (qua Sheets API hoặc export CSV), nạp vào bảng staging trước, có ghi nguồn + số dòng.
-- Chuẩn hoá, import có kiểm soát, mã chống trùng (giữ nguyên `source_ref`/`idempotency_key` đã có).
-- Đối soát số dòng + tổng tiền từng loại giữa Sheets và Postgres, xuất báo cáo.
-- **Xong khi:** số dòng khớp 100% (so với số liệu đã có trong `DATA_MIGRATION.md`); tổng thu/chi/số dư ví khớp 100%; chạy lại script không tạo dòng trùng.
+- Quy trình cụ thể đã nghiên cứu kỹ, xem `docs/RESEARCH_SHEETS_TO_SUPABASE.md`: (1) xuất dữ liệu bằng hàm thêm vào Apps Script sẵn có (`Sheets API batchGet`, `valueRenderOption=UNFORMATTED_VALUE` để tránh lỗi định dạng số/ngày) → (2) nạp thô vào bảng **staging** bằng `COPY`/`\copy` qua kết nối trực tiếp Postgres (không qua Table Editor CSV — công cụ này huỷ toàn bộ import chỉ vì 1 dòng lỗi, theo xác nhận của chính Supabase) → (3) kiểm tra/đối soát ngay trên staging → (4) gộp vào bảng chính bằng `INSERT ... SELECT ... ON CONFLICT (source_ref) DO NOTHING` theo đúng thứ tự khoá ngoại.
+- Mỗi dòng nguồn gắn thêm cột `source_ref` ổn định (ví dụ `imp:<tên sheet>:<số dòng gốc>`) để script có thể chạy lại an toàn (idempotent) sau khi lỗi giữa đường — test idempotency: chạy lần 2 không tăng thêm dòng nào.
+- Đối soát số dòng **và** tổng tiền kiểm soát (tổng thu, tổng chi, tổng chuyển vào = tổng chuyển ra, số dư cuối từng ví theo công thức CLAUDE.md §8) — không chỉ đếm dòng. Không chèn bút toán "vá" cho khớp tổng khi có lệch — phải tìm đúng dòng gây lệch.
+- Dòng nào không qua được kiểm tra ghi vào bảng ngoại lệ riêng, không âm thầm bỏ qua. Không ghi ngược lại vào Google Sheet gốc.
+- **Xong khi:** số dòng khớp 100% (so với số liệu đã có trong `DATA_MIGRATION.md`); tổng thu/chi/số dư ví khớp 100%; chạy lại script không tạo dòng trùng; mọi ngoại lệ được báo cáo và giải thích được, không có bút toán vá.
+- **Cần người dùng xác nhận trước khi coi giai đoạn này xong:** ngưỡng lệch số tiền nào được coi là chấp nhận được khi đối soát (nếu có lệch nhỏ do làm tròn lịch sử) — đây là quyết định nghiệp vụ, không phải kỹ thuật.
 
 ### Giai đoạn 7 — Giao diện
 - Dựng lại từng màn hình theo đúng đặc tả `docs/UI_UX_GUIDELINES.md` (màu, typography, bố cục, component, từng màn hình cụ thể) — **không** copy nguyên giao diện Apps Script, đây là thiết kế mới (phong cách fintech chuyên nghiệp, điều hướng dạng drawer, đã duyệt 07/11/2026): Tổng quan, Thêm giao dịch, Danh sách, Ví, Ngân sách, Tài sản/Nợ, Sự kiện, Vàng, Sổ cưới, Admin.
