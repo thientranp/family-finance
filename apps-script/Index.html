@@ -395,11 +395,7 @@ function renderHome(){
 function renderHomeData(d){
   var sub=S.view.homeTab||'budget';
   var kids=[header('Tổng quan')];
-  kids.push(h('div',{class:'card hero'},[
-    h('div',{class:'lbl',text:'Tài sản ròng'}),h('div',{class:'big',text:fmt(d.net_worth)}),
-    h('div',{class:'sub'},[h('span',{text:'Tiền khả dụng '+fmt(d.cash_available)}),h('span',{text:'Tiết kiệm '+fmt(d.savings)}),h('span',{text:'Tài sản '+fmt(d.assets)}),d.receivables?h('span',{text:'Người khác còn nợ '+fmt(d.receivables)}):null,h('span',{text:'Nợ '+fmt(d.liabilities)})]),
-    d.held_in_trust?h('div',{class:'sub',style:'margin-top:6px'},[h('span',{text:'Tiền giữ hộ (không tính vào tài sản ròng): '+fmt(d.held_in_trust)})]):null
-  ]));
+  kids=kids.concat(netWorthCards(d.nw_summary));
   kids.push(periodNav(renderHome));
   kids.push(h('div',{class:'grid3',style:'margin-top:10px'},[
     h('div',{class:'kpi'},[h('div',{class:'lbl',text:'Thu nhập'}),h('div',{class:'val inc',text:fmt(d.flow.income)})]),

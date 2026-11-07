@@ -119,6 +119,7 @@ function dashboard_(m, period) {
   return {
     period: period,
     cash_available: nw.cash, savings: nw.savings, assets: nw.assets, receivables: nw.receivables, liabilities: nw.liabilities, held_in_trust: nw.held_in_trust, net_worth: nw.net_worth,
+    nw_summary: nw,
     flow: flow, budget: budget, wallets: wallets, alerts: alerts, recent: recent, debts_open: debtsOpen,
     health: { last_integrity: getSetting_('last_integrity', ''), last_backup_weekly: getSetting_('last_backup_weekly', ''), last_backup_monthly: getSetting_('last_backup_monthly', '') }
   };

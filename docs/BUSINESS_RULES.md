@@ -94,6 +94,21 @@ Bổ sung/ghi đè một phần quyết định 06/11/2026 trong `DATA_MIGRATION
   - Chỉ 174 dòng kiểu **Chi** được gắn; 5 dòng **Thu** dưới sự kiện "Về quê" không được gắn (đúng quy tắc: sự kiện chỉ áp dụng Chi tiêu). [ĐÃ DUYỆT]
   - Kỹ thuật: gắn `event_id` bổ sung vào các giao dịch Chi tiêu **đã nhập từ trước** (khớp theo `idempotency_key`) — đã xác minh cột `event_id` không nằm trong công thức băm `row_hash`, nên thao tác này an toàn tuyệt đối với chuỗi chống sửa của sổ cái.
 
+## Thẻ tín dụng (HSBC và các thẻ khác) — quyết định 07/11/2026
+Không thêm bảng/cột/kiểu giao dịch mới — toàn bộ quy trình dưới đây dùng lại nguyên các tính năng đã có (Ví, Chuyển ví, Khoản vay `Liabilities`, Lãi suất khoản vay `LiabilityRates`, Điều chỉnh số dư ví). Đây là **hướng dẫn sử dụng**, không phải tính năng mới.
+
+- **Thẻ tín dụng = một Ví loại `bank`** như các ví khác (người dùng chủ động không muốn tạo `wallet_type` riêng vì thẻ tín dụng không có ý nghĩa gì khác ngoài là một kiểu ví). Ví này được phép có số dư **âm** — hệ thống không chặn số dư âm với Chi tiêu/Chuyển ví/Điều chỉnh (chỉ `loan_payment` mới chặn trả quá dư nợ), nên dư nợ thẻ hiển thị tự nhiên là số dư âm của ví, không cần cơ chế riêng. [ĐÃ DUYỆT]
+- **Nhiều thẻ** (tính trước cho mở rộng sau này): mỗi thẻ là một Ví riêng (vd "HSBC Visa - Anh", "HSBC Visa - Em"), không giới hạn số lượng — không cần sửa code khi thêm thẻ mới. [ĐÃ DUYỆT]
+- **Chi tiêu bằng thẻ**: ghi `expense` bình thường từ ví-thẻ đó (số dư ví giảm thêm, tức dư nợ tăng).
+- **Trả nợ thẻ (thanh toán sao kê)**: ghi `transfer` từ ví khác (vd ví ngân hàng thường) **vào** ví-thẻ — đúng y cách làm cũ trước đây của người dùng, không cần thay đổi gì. [ĐÃ DUYỆT — người dùng xác nhận cách làm cũ vẫn áp dụng được]
+- **Gói trả góp trên thẻ ("chuyển đổi trả góp")**: mỗi gói là một `Liability` mới (giống mô hình "Vay mua xe Cx3" đã có) — `opening_balance` = số tiền gốc của gói, trả dần bằng `loan_payment` theo từng kỳ sao kê. Lãi suất gói (có gói có lãi, có gói không, và có thể đổi giữa kỳ) theo dõi bằng `LiabilityRates` — mỗi lần đổi lãi suất thêm 1 dòng mới, không sửa đè. [ĐÃ DUYỆT]
+- **Xử lý thời điểm "chuyển đổi"** (dư nợ đang nằm trên ví-thẻ được ngân hàng chuyển thành gói trả góp mới — tránh đếm trùng dư nợ ở cả ví-thẻ và khoản vay mới): ghi một `adjustment` (Điều chỉnh số dư ví) **cộng lại** đúng số tiền chuyển đổi vào ví-thẻ (lý do: "Chuyển sang gói trả góp — <tên gói>"), đồng thời tạo `Liability` mới với `opening_balance` bằng đúng số đó. Kết quả: dư nợ biến mất khỏi ví-thẻ, xuất hiện lại đúng 1 lần ở khoản vay mới — không đếm trùng, có đầy đủ lý do + người thực hiện + thời điểm trong nhật ký điều chỉnh (immutable). [ĐÃ DUYỆT]
+- **Phí chuyển đổi** (một số gói có, một số không): theo xác nhận của người dùng, phí này được ngân hàng tính chung vào sao kê của kỳ trả góp đầu tiên (sao kê kế tiếp = kỳ trả góp 1 + phí chuyển đổi cùng lúc). Ghi **2 giao dịch riêng, cùng ngày sao kê đó**:
+  1. `loan_payment` cho đúng số tiền kỳ trả góp 1 (gắn vào khoản vay/gói trả góp đó — giữ đúng lịch trả nợ, không làm lệch số dư gói).
+  2. `expense` riêng cho phí chuyển đổi, danh mục **"Phí ngân hàng & thẻ"** (danh mục đã có sẵn trong hệ thống) — không đụng tới số dư khoản vay.
+  Tách riêng như vậy để số liệu trả góp (gốc + lãi) không bị lẫn với phí một lần, dễ đối soát với sao kê ngân hàng. [ĐÃ DUYỆT]
+- **Kết luận**: toàn bộ quy trình trên dùng 100% tính năng đã có và đã kiểm thử (Ví số dư âm, Chi tiêu, Chuyển ví, Điều chỉnh số dư, Khoản vay, Lãi suất khoản vay, danh mục "Phí ngân hàng & thẻ") — **không cần sửa code**, chỉ cần làm đúng quy trình ghi nhận ở trên.
+
 ## Ngân sách
 - Theo tháng, số tiền cố định theo lọ; tháng mới sao chép từ tháng gần nhất trước đó. [ĐÃ DUYỆT]
 - Chỉ sửa được tháng hiện tại và tương lai; tháng đã qua giữ nguyên. Mọi thay đổi có nhật ký.
