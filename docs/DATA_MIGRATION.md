@@ -1,5 +1,7 @@
 # Nhập dữ liệu lịch sử (Appsheet_Finance.xlsx)
 
+> ⚠️ **File này ghi lại việc nhập Excel → Google Sheets đã làm xong (lịch sử, đã đóng).** Đây **không phải** kế hoạch cho việc chuyển Google Sheets → Supabase. Nguồn dữ liệu cho việc chuyển sang Supabase là **chính Google Sheet hiện tại** (đã chuẩn hoá, đã có `event_id`, `row_hash`, các sheet Events/GoldLots/WeddingGifts/LiabilityRates...) — xem `MIGRATION_PLAN.md` Giai đoạn 6 và `RESEARCH_SHEETS_TO_SUPABASE.md` cho quy trình đó. File này chỉ còn giá trị tham khảo cách đối soát/chống trùng đã dùng trước đây.
+
 File gốc **không bao giờ bị sửa** (chỉ đọc). Phạm vi chính: sheet `finance` (4.504 dòng, 01/12/2022–07/08/2025) và `change` (369 dòng chuyển ví). Các sheet `setting`, `report`, `saving`, `cheppy_newborn` **chưa nhập** (không phải giao dịch; cần quyết định riêng khi cần). `gold` (9 dòng), `wedding` (487 dòng) và `event` (9 dòng, trong đó 6 được nhập thật) đã có quyết định và đã nhập xong — xem các mục riêng ngay dưới đây.
 
 ## Vàng + Sổ cưới — ĐÃ QUYẾT ĐỊNH VÀ NHẬP (07/11/2026)

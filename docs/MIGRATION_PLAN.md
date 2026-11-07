@@ -123,8 +123,8 @@ Mỗi giai đoạn kết thúc bằng: danh sách file thay đổi, kết quả 
 - Mỗi dòng nguồn gắn thêm cột `source_ref` ổn định (ví dụ `imp:<tên sheet>:<số dòng gốc>`) để script có thể chạy lại an toàn (idempotent) sau khi lỗi giữa đường — test idempotency: chạy lần 2 không tăng thêm dòng nào.
 - Đối soát số dòng **và** tổng tiền kiểm soát (tổng thu, tổng chi, tổng chuyển vào = tổng chuyển ra, số dư cuối từng ví theo công thức CLAUDE.md §8) — không chỉ đếm dòng. Không chèn bút toán "vá" cho khớp tổng khi có lệch — phải tìm đúng dòng gây lệch.
 - Dòng nào không qua được kiểm tra ghi vào bảng ngoại lệ riêng, không âm thầm bỏ qua. Không ghi ngược lại vào Google Sheet gốc.
-- **Xong khi:** số dòng khớp 100% (so với số liệu đã có trong `DATA_MIGRATION.md`); tổng thu/chi/số dư ví khớp 100%; chạy lại script không tạo dòng trùng; mọi ngoại lệ được báo cáo và giải thích được, không có bút toán vá.
-- **Cần người dùng xác nhận trước khi coi giai đoạn này xong:** ngưỡng lệch số tiền nào được coi là chấp nhận được khi đối soát (nếu có lệch nhỏ do làm tròn lịch sử) — đây là quyết định nghiệp vụ, không phải kỹ thuật.
+- **Không đặt ngưỡng lệch số tiền tự động chấp nhận** (quyết định 07/11/2026) — bất kỳ lệch nào giữa tổng nguồn (Google Sheets) và tổng đích (Postgres), dù nhỏ, đều phải **ghi vào log đối soát** (per bảng: tổng nguồn, tổng đích, số lệch, danh sách dòng liên quan) để bạn tự xem và quyết định, không tự động coi là "đạt" hay "chặn" dựa trên một mức sai số định trước.
+- **Xong khi:** số dòng khớp 100% (so với số liệu đã có trong `DATA_MIGRATION.md`); log đối soát tổng tiền đã xuất ra cho từng bảng (có hoặc không có lệch) và đã được bạn xem qua; chạy lại script không tạo dòng trùng; mọi ngoại lệ được báo cáo và giải thích được, không có bút toán vá.
 
 ### Giai đoạn 7 — Giao diện
 - Dựng lại từng màn hình theo đúng đặc tả `docs/UI_UX_GUIDELINES.md` (màu, typography, bố cục, component, từng màn hình cụ thể) — **không** copy nguyên giao diện Apps Script, đây là thiết kế mới (phong cách fintech chuyên nghiệp, điều hướng dạng drawer, đã duyệt 07/11/2026): Tổng quan, Thêm giao dịch, Danh sách, Ví, Ngân sách, Tài sản/Nợ, Sự kiện, Vàng, Sổ cưới, Admin.
