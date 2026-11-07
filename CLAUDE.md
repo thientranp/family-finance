@@ -892,7 +892,8 @@ Dự án này đã trải qua các giai đoạn:
 2. `docs/REQUIREMENTS_SPECIFICATION.md` — bối cảnh và các REQ-ID gốc.
 3. `docs/BUSINESS_RULES.md` — quy tắc nghiệp vụ mới nhất, chi tiết nhất, có hiệu lực cao nhất khi có mâu thuẫn với tài liệu khác.
 4. `docs/DATABASE_SCHEMA.md` — cấu trúc dữ liệu hiện tại (Google Sheets), dùng làm cơ sở thiết kế bảng Postgres.
-5. `docs/MIGRATION_PLAN.md` — kế hoạch triển khai Supabase + Vercel, các giai đoạn, tiêu chí hoàn thành.
-6. `docs/DATA_MIGRATION.md` — lịch sử nhập dữ liệu Excel → Sheets, để tham khảo quy trình đối soát khi nhập Sheets → Postgres.
+5. `docs/UI_UX_GUIDELINES.md` — đặc tả giao diện/trải nghiệm chi tiết (màu, typography, bố cục, từng màn hình) cho bản Supabase/Next.js — dùng khi code Giai đoạn 7.
+6. `docs/MIGRATION_PLAN.md` — kế hoạch triển khai Supabase + Vercel, các giai đoạn, tiêu chí hoàn thành.
+7. `docs/DATA_MIGRATION.md` — lịch sử nhập dữ liệu Excel → Sheets, để tham khảo quy trình đối soát khi nhập Sheets → Postgres.
 
 Mã nguồn Apps Script hiện tại (`apps-script/`) **không cần mang qua** dự án Next.js/Supabase mới — không dùng lại được do khác ngôn ngữ/kiến trúc hoàn toàn. Giữ nguyên trong repo cũ làm lịch sử/tham khảo, không xoá.

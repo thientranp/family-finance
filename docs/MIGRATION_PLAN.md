@@ -125,8 +125,9 @@ Mỗi giai đoạn kết thúc bằng: danh sách file thay đổi, kết quả 
 - **Xong khi:** số dòng khớp 100% (so với số liệu đã có trong `DATA_MIGRATION.md`); tổng thu/chi/số dư ví khớp 100%; chạy lại script không tạo dòng trùng.
 
 ### Giai đoạn 7 — Giao diện
-- Dựng lại từng màn hình đã có trên Apps Script: Tổng quan, Thêm giao dịch, Danh sách, Ví, Ngân sách, Tài sản/Nợ, Sự kiện, Vàng, Sổ cưới, Admin.
-- **Xong khi:** dùng được đầy đủ như bản Apps Script, trên điện thoại và desktop, không lỗi console.
+- Dựng lại từng màn hình theo đúng đặc tả `docs/UI_UX_GUIDELINES.md` (màu, typography, bố cục, component, từng màn hình cụ thể) — **không** copy nguyên giao diện Apps Script, đây là thiết kế mới (phong cách fintech chuyên nghiệp, điều hướng dạng drawer, đã duyệt 07/11/2026): Tổng quan, Thêm giao dịch, Danh sách, Ví, Ngân sách, Tài sản/Nợ, Sự kiện, Vàng, Sổ cưới, Admin.
+- Áp dụng đúng checklist ở mục 10 của `UI_UX_GUIDELINES.md` cho từng màn hình trước khi báo cáo xong.
+- **Xong khi:** dùng được đầy đủ nghiệp vụ như bản Apps Script, đúng token/thành phần trong `UI_UX_GUIDELINES.md`, trên điện thoại và desktop, không lỗi console.
 
 ### Giai đoạn 8 — Kiểm thử tổng thể
 - Dịch 53 test case hiện có (Vitest + database test thật, không mock); bổ sung test Auth/RLS; Playwright cho luồng nhập nhanh trên điện thoại.

@@ -112,6 +112,7 @@ Sau khi copy, `D:\FAMILY_FINANCE_SUPABASE\` sẽ có:
 - `docs\REQUIREMENTS_SPECIFICATION.md` — yêu cầu gốc đã được xác nhận.
 - `docs\BUSINESS_RULES.md` — toàn bộ quy tắc nghiệp vụ đã chốt (mới nhất, đầy đủ nhất).
 - `docs\DATABASE_SCHEMA.md` — cấu trúc dữ liệu hiện tại.
+- `docs\UI_UX_GUIDELINES.md` — đặc tả giao diện/trải nghiệm chi tiết (màu, font, bố cục, từng màn hình) để AI code đúng giao diện đã duyệt.
 - `docs\MIGRATION_PLAN.md` — kế hoạch triển khai từng giai đoạn.
 - `docs\DATA_MIGRATION.md` — quy trình đối soát dữ liệu tham khảo.
 
