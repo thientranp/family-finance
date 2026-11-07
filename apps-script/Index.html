@@ -66,6 +66,13 @@ svg.i{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke
 .ibadge.inc{background:var(--ok-soft);color:var(--income)}
 .ibadge.exp{background:var(--over-soft);color:var(--expense)}
 .ibadge.neu{background:var(--primary-soft);color:var(--primary)}
+.nw-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.nw-col{display:flex;flex-direction:column;gap:12px}
+.nw-col-title{font-size:.72rem;color:var(--muted);font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:2px}
+.nw-item{display:flex;align-items:center;gap:10px}
+.nw-item .t{font-size:.78rem;color:var(--muted);margin-bottom:1px}
+.nw-item .v{font-weight:700;font-size:.92rem;line-height:1.25}
+@media(min-width:900px){.nw-item .v{font-size:1rem}}
 .row.has-icon{gap:12px}
 .subtabs{display:flex;gap:8px;margin:12px 0 10px}
 .subtabs button{flex:1;min-height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-weight:600;font-size:.85rem;display:flex;align-items:center;justify-content:center;gap:6px}
@@ -858,18 +865,32 @@ function openingForm(w){
 }
 
 /* Tài sản — tab riêng trên sidebar/điều hướng chính (tách khỏi "Khoản vay"). */
+// Thẻ "Tài sản ròng": 1 hero tổng + 2 cột card có icon — trái "Tiền & Tiết kiệm" (ví),
+// phải "Tài sản & Nợ". Dùng chung cho tab Tài sản (và có thể tái dùng nơi khác sau này).
+function netWorthCards(s){
+  function item(icon,tone,label,value){ return h('div',{class:'nw-item'},[iconBadge(icon,tone),h('div',null,[h('div',{class:'t',text:label}),h('div',{class:'v',text:value})])]); }
+  var left=h('div',{class:'card nw-col'},[h('div',{class:'nw-col-title',text:'Tiền & Tiết kiệm'}),
+    item('cash','neu','Tiền mặt',fmt(s.cash)), item('savings','neu','Tiết kiệm',fmt(s.savings))]);
+  var rightItems=[h('div',{class:'nw-col-title',text:'Tài sản & Nợ'}),
+    item('box','inc','Tài sản',fmt(s.assets)), item('card','exp','Nợ',fmt(-s.liabilities))];
+  if(s.receivables)rightItems.push(item('people','inc','Phải thu (nợ cá nhân)',fmt(s.receivables)));
+  var right=h('div',{class:'card nw-col'},rightItems);
+  var kids=[h('div',{class:'card hero'},[h('div',{class:'lbl',text:'Tài sản ròng'}),h('div',{class:'big',text:fmt(s.net_worth)})]),
+    h('div',{class:'nw-grid'},[left,right])];
+  if(s.held_in_trust)kids.push(h('div',{class:'hint',text:'Đang giữ hộ '+fmt(s.held_in_trust)+' — không tính vào tài sản ròng.'}));
+  return kids;
+}
 function renderAssetsTab(){
   loading();
   api('assets').then(function(a){
     S.view.assets=a;
     var s=a.summary, kids=[header('Tài sản')];
-    kids.push(h('div',{class:'card hero'},[h('div',{class:'lbl',text:'Tài sản ròng'}),h('div',{class:'big',text:fmt(s.net_worth)}),
-      h('div',{class:'sub'},[h('span',{text:'Tiền '+fmt(s.cash)}),h('span',{text:'Tiết kiệm '+fmt(s.savings)}),h('span',{text:'Tài sản '+fmt(s.assets)}),h('span',{text:'Nợ '+fmt(s.liabilities)})])]));
+    kids=kids.concat(netWorthCards(s));
     var ac=h('div',{class:'card'});
     if(!a.assets.length)ac.appendChild(h('div',{class:'empty',text:'Chưa có tài sản.'}));
     a.assets.forEach(function(x){ ac.appendChild(h('button',{class:'tap',type:'button',style:(x.sold||!x.active)?'opacity:.55':null,onclick:function(){assetSheet(x);}},[h('div',{class:'row'},[h('div',{class:'l'},[h('div',{class:'t',text:x.name}),h('div',{class:'s',text:x.type_label+(x.sold?' · đã bán':'')+(!x.active?' · đã ẩn':'')+(x.purchase_date?' · '+dmy(x.purchase_date):'')})]),h('div',{class:'r',text:fmt(x.purchase_value)})])])); });
     kids.push(ac,h('button',{class:'btn primary block',type:'button',text:'Thêm tài sản',onclick:assetForm}));
-    kids.push(h('div',{class:'hint',style:'margin-top:12px',text:'Giá trị tài sản là giá mua đã nhập; hệ thống không tự định giá lại. Tiền giữ hộ không tính vào tài sản ròng.'}));
+    kids.push(h('div',{class:'hint',style:'margin-top:12px',text:'Giá trị tài sản là giá mua đã nhập; hệ thống không tự định giá lại.'}));
     $app.replaceChildren.apply($app,kids);
   },function(e){fail(e,renderAssetsTab);});
 }
