@@ -974,6 +974,111 @@ test_('Nhập vàng + sổ cưới cũ từ Excel (ImportGoldWedding): đối ch
   eq_(readAll_('WeddingGifts').filter(isSeedWedding).length, 487, 'vẫn đúng 487 dòng, không nhân đôi');
 });
 
+test_('Sự kiện: gắn vào Chi tiêu, không gắn được Thu nhập, khoá khi kết thúc, xoá bị khoá khi có giao dịch', function () {
+  var m = asUser_(T_EMAIL_1);
+  var ev = createEvent_(m, { name: 'Du lịch Đà Lạt', start_date: '2026-11-01', end_date: '2026-11-05' });
+  eq_(readAll_('Events').filter(function (x) { return x.event_id === ev.event_id; })[0].status, 'ongoing', 'mặc định đang diễn ra');
+
+  var t1 = exp_(m, 'W001', 200000, 'J1', { event_id: ev.event_id });
+  eq_(lastTxn_().event_id, ev.event_id, 'giao dịch chi tiêu được gắn đúng sự kiện');
+
+  // Thu nhập không nhận event_id (bị bỏ qua lặng lẽ vì spec.event_id chỉ được đọc ở nhánh 'expense').
+  inc_(m, 'W001', 100000, { event_id: ev.event_id, category_id: '' });
+  eq_(lastTxn_().event_id, '', 'thu nhập không gắn sự kiện (quyết định: sự kiện chỉ áp dụng Chi tiêu)');
+
+  eq_(eventHasTxn_(ev.event_id), true, 'đã có giao dịch gắn vào');
+  throws_(function () { deleteEvent_(m, { event_id: ev.event_id }); }, 'EVENT', 'không xoá được vì đã có giao dịch');
+  updateEvent_(m, { event_id: ev.event_id, active: 0 });
+  eq_(readAll_('Events').filter(function (x) { return x.event_id === ev.event_id; })[0].active, 0, 'vẫn ẩn được bình thường');
+  updateEvent_(m, { event_id: ev.event_id, active: 1 });
+
+  endEvent_(m, { event_id: ev.event_id });
+  eq_(readAll_('Events').filter(function (x) { return x.event_id === ev.event_id; })[0].status, 'ended', 'đã kết thúc');
+  throws_(function () { exp_(m, 'W001', 50000, 'J1', { event_id: ev.event_id }); }, 'EVENT', 'sự kiện đã kết thúc không gắn thêm được, dù chọn tay');
+
+  var ev2 = createEvent_(m, { name: 'Chưa có giao dịch gì' });
+  deleteEvent_(m, { event_id: ev2.event_id });
+  eq_(readAll_('Events').filter(function (x) { return x.event_id === ev2.event_id; }).length, 0, 'xoá được vì chưa có giao dịch nào');
+});
+
+test_('Sự kiện: "bật tự gắn" theo từng thành viên (độc lập, không ảnh hưởng người khác), kết thúc sự kiện tự tắt cho mọi người đang bật', function () {
+  var m1 = asUser_(T_EMAIL_1), m2 = asUser_(T_EMAIL_2);
+  var evA = createEvent_(m1, { name: 'Về quê Tết A' });
+  var evB = createEvent_(m1, { name: 'Về quê Tết B' });
+
+  asUser_(T_EMAIL_1);
+  setCurrentEvent_(m1, { event_id: evA.event_id });
+  eq_(readAll_('Members').filter(function (x) { return x.member_id === m1.member_id; })[0].current_event_id, evA.event_id, 'member1 đã bật A');
+
+  asUser_(T_EMAIL_2);
+  setCurrentEvent_(m2, { event_id: evB.event_id });
+  eq_(readAll_('Members').filter(function (x) { return x.member_id === m2.member_id; })[0].current_event_id, evB.event_id, 'member2 bật B độc lập');
+  eq_(readAll_('Members').filter(function (x) { return x.member_id === m1.member_id; })[0].current_event_id, evA.event_id, 'member1 không bị ảnh hưởng');
+
+  // Bật sự kiện mới tự tắt sự kiện cũ CỦA CHÍNH người đó.
+  asUser_(T_EMAIL_1);
+  setCurrentEvent_(m1, { event_id: evB.event_id });
+  eq_(readAll_('Members').filter(function (x) { return x.member_id === m1.member_id; })[0].current_event_id, evB.event_id, 'bật B thì tự tắt A cho chính mình');
+
+  // Kết thúc sự kiện B: tự tắt current_event_id của mọi người đang bật nó (cả member1 và member2).
+  endEvent_(m1, { event_id: evB.event_id });
+  eq_(readAll_('Members').filter(function (x) { return x.member_id === m1.member_id; })[0].current_event_id, '', 'member1 tự tắt vì B đã kết thúc');
+  eq_(readAll_('Members').filter(function (x) { return x.member_id === m2.member_id; })[0].current_event_id, '', 'member2 cũng tự tắt vì B đã kết thúc');
+
+  throws_(function () { setCurrentEvent_(m1, { event_id: evB.event_id }); }, 'EVENT', 'không bật lại được sự kiện đã kết thúc');
+});
+
+test_('Sự kiện: ngân sách dự kiến — tổng chi và còn lại/vượt tính đúng theo sự kiện', function () {
+  var m = asUser_(T_EMAIL_1);
+  var ev = createEvent_(m, { name: 'Du lịch Phú Quốc', planned_budget: 10000000 });
+  exp_(m, 'W001', 4000000, 'J1', { event_id: ev.event_id });
+  exp_(m, 'W001', 3000000, 'J2', { event_id: ev.event_id });
+  exp_(m, 'W001', 1000000, 'J1', {}); // không gắn sự kiện, không được tính vào
+
+  var detail = eventDetailView_(m, { event_id: ev.event_id });
+  eq_(detail.total, 7000000, 'tổng chi đúng, không tính giao dịch không gắn sự kiện');
+  eq_(detail.remaining, 3000000, 'còn lại = 10tr - 7tr');
+  eq_(detail.transactions.length, 2, 'đúng 2 giao dịch gắn vào sự kiện này');
+  var jarTotal = 0; detail.by_jar.forEach(function (x) { jarTotal += x.amount; });
+  eq_(jarTotal, 7000000, 'tổng theo lọ khớp tổng chi');
+
+  var view = eventsView_(m);
+  var row = view.events.filter(function (x) { return x.event_id === ev.event_id; })[0];
+  eq_(row.spent, 7000000, 'eventsView_ tính đúng tổng chi');
+  eq_(row.remaining, 3000000, 'eventsView_ tính đúng còn lại');
+
+  exp_(m, 'W001', 5000000, 'J1', { event_id: ev.event_id });
+  eq_(eventDetailView_(m, { event_id: ev.event_id }).remaining, -2000000, 'vượt ngân sách thì còn lại là số âm');
+});
+
+test_('Nhập sự kiện cũ (ImportEvents) từ Excel: tạo sự kiện + gắn event_id vào giao dịch đã nhập trước đây, an toàn với chuỗi row_hash, chống trùng', function () {
+  var m = asUser_(T_EMAIL_1);
+  // Dựng sẵn 2 giao dịch "đã nhập từ trước" giống hệt cách Import.gs gắn idempotency_key.
+  var r1 = exp_(m, 'W001', 300000, 'J1', { key: 'imp:finance:test_evt_1' });
+  var r2 = exp_(m, 'W001', 150000, 'J1', { key: 'imp:finance:test_evt_2' });
+  ok_(integrityScan_().ok, 'sổ cái sạch trước khi nhập sự kiện');
+
+  var rows = [
+    { source_ref: 'imp:event:test_unit_1', name: 'Du lịch Nha Trang (test)', start_date: '2023-01-01', end_date: '2023-01-03', status: 'ended', finance_ids: ['test_evt_1', 'test_evt_2'] }
+  ];
+  var res = importEventsCore_(m, rows);
+  eq_(res.created.length, 1, 'tạo được 1 sự kiện mới');
+  eq_(res.tagged, 2, 'gắn được đúng 2 giao dịch');
+  var ev = readAll_('Events').filter(function (x) { return x.source_ref === 'imp:event:test_unit_1'; })[0];
+  eq_(readAll_('Transactions').filter(function (t) { return t.idempotency_key === 'imp:finance:test_evt_1'; })[0].event_id, ev.event_id, 'giao dịch 1 đã được gắn đúng event_id');
+  eq_(readAll_('Transactions').filter(function (t) { return t.idempotency_key === 'imp:finance:test_evt_2'; })[0].event_id, ev.event_id, 'giao dịch 2 đã được gắn đúng event_id');
+
+  ok_(integrityScan_().ok, 'ghi bổ sung event_id vào dòng sổ cái đã tồn tại KHÔNG làm hỏng chuỗi row_hash chống sửa');
+
+  // Chạy lại không nhân đôi: sự kiện đã có source_ref thì bỏ qua tạo mới, giao dịch đã có event_id thì bỏ qua gắn lại.
+  var res2 = importEventsCore_(m, rows);
+  eq_(res2.created.length, 0, 'chạy lại không tạo thêm sự kiện');
+  eq_(res2.skipped.length, 1, 'bỏ qua sự kiện đã có source_ref trùng');
+  eq_(res2.tagged, 0, 'chạy lại không gắn lại giao dịch đã có event_id');
+  eq_(res2.tagged_skipped, 2, 'cả 2 giao dịch bị bỏ qua vì đã có event_id từ trước');
+  eq_(readAll_('Events').filter(function (x) { return x.source_ref === 'imp:event:test_unit_1'; }).length, 1, 'không nhân đôi sự kiện trong sheet');
+});
+
 // ---------- runner ----------
 function runAllTests() { return runTests_(null); }
 

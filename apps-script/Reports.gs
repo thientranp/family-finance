@@ -15,7 +15,7 @@ function bootstrap_(m) {
   var st = buildState_();
   return {
     version: FF_V.Core,
-    me: { member_id: m.member_id, display_name: m.display_name, email: m.email },
+    me: { member_id: m.member_id, display_name: m.display_name, email: m.email, current_event_id: m.current_event_id || '' },
     today: todayYmd_(),
     period: currentPeriod_(),
     members: readAll_('Members').filter(function (x) { return x.active === 1; }).map(function (x) { return { member_id: x.member_id, display_name: x.display_name }; }),
@@ -43,7 +43,8 @@ function listTxns_(m, f) {
   var wn = nameMap_('Wallets', 'wallet_id', 'name'), jn = nameMap_('Jars', 'jar_id', 'name'),
     cn = nameMap_('Categories', 'category_id', 'name'), mn = nameMap_('Members', 'member_id', 'display_name'),
     ln = nameMap_('Liabilities', 'liability_id', 'name'), an = nameMap_('Assets', 'asset_id', 'name'),
-    gn = nameMap_('GoldLots', 'lot_id', 'brand'), dn = nameMap_('Debts', 'debt_id', 'counterparty');
+    gn = nameMap_('GoldLots', 'lot_id', 'brand'), dn = nameMap_('Debts', 'debt_id', 'counterparty'),
+    en = nameMap_('Events', 'event_id', 'name');
   mn.FAMILY = 'Cả gia đình';
   var q = f.q ? String(f.q).toLowerCase() : '';
   var out = [];
@@ -57,6 +58,7 @@ function listTxns_(m, f) {
     if (f.kind && t.txn_kind !== f.kind) return;
     if (f.jar_id && t.jar_id !== f.jar_id) return;
     if (f.category_id && t.category_id !== f.category_id) return;
+    if (f.event_id && t.event_id !== f.event_id) return;
     if (f.amount_min && t.amount < Number(f.amount_min)) return;
     if (f.amount_max && t.amount > Number(f.amount_max)) return;
     var te = entBy[t.txn_id] || [];
@@ -68,6 +70,7 @@ function listTxns_(m, f) {
       debt_lines: (lentBy[t.txn_id] || []).map(function (e) { return { liability: ln[e.liability_id] || e.liability_id, amount: e.amount }; })
         .concat((dentBy[t.txn_id] || []).map(function (e) { return { liability: dn[e.debt_id] || e.debt_id, amount: e.amount }; })),
       jar: jn[t.jar_id] || '', category: cn[t.category_id] || '', paid_by: mn[t.paid_by] || '', beneficiary: mn[t.beneficiary] || '',
+      event_id: t.event_id || '', event: en[t.event_id] || '',
       ref: ln[t.ref_id] || an[t.ref_id] || gn[t.ref_id] || dn[t.ref_id] || '', note: t.note, reason: t.reason, balance_before: t.balance_before, balance_after: t.balance_after,
       reverses_id: t.reverses_id, reversed: !!reversedBy[t.txn_id],
       reversible: t.txn_kind !== 'reversal' && !reversedBy[t.txn_id],

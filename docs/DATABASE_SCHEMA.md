@@ -6,12 +6,13 @@ Mọi sheet có dòng 1 là tiêu đề. Kiểu: t = chữ (định dạng văn 
 
 ## Members
 
-| Cột | Kiểu |
-|---|---|
-| member_id | t |
-| display_name | t |
-| email | t |
-| active | n |
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| member_id | t | |
+| display_name | t | |
+| email | t | |
+| active | n | |
+| current_event_id | t | "Sự kiện đang bật" để tự gắn vào giao dịch Chi tiêu MỚI của chính thành viên này (mỗi người một con trỏ riêng — bật/tắt của người này không ảnh hưởng người khác). Trống = không bật gì. Thêm 07/11/2026. |
 
 ## Wallets
 
@@ -72,28 +73,29 @@ Mọi sheet có dòng 1 là tiêu đề. Kiểu: t = chữ (định dạng văn 
 ## Transactions
 Sổ cái KHÔNG sửa/xóa. Ghi **sau cùng** (dấu xác nhận hoàn tất). Sửa sai bằng bút toán đảo (reversal). prev_hash/row_hash tạo chuỗi băm SHA-256 để phát hiện sửa tay.
 
-| Cột | Kiểu |
-|---|---|
-| txn_id | t |
-| txn_kind | t |
-| txn_date | t |
-| amount | n |
-| category_id | t |
-| jar_id | t |
-| paid_by | t |
-| beneficiary | t |
-| note | t |
-| reason | t |
-| balance_before | n |
-| balance_after | n |
-| reverses_id | t |
-| ref_id | t |
-| idempotency_key | t |
-| entry_count | n |
-| created_by | t |
-| created_at | t |
-| prev_hash | t |
-| row_hash | t |
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| txn_id | t | |
+| txn_kind | t | |
+| txn_date | t | |
+| amount | n | |
+| category_id | t | |
+| jar_id | t | |
+| paid_by | t | |
+| beneficiary | t | |
+| note | t | |
+| reason | t | |
+| balance_before | n | |
+| balance_after | n | |
+| reverses_id | t | |
+| ref_id | t | |
+| idempotency_key | t | |
+| entry_count | n | |
+| created_by | t | |
+| created_at | t | |
+| prev_hash | t | |
+| row_hash | t | |
+| event_id | t | Sự kiện gắn vào (chỉ có giá trị khi txn_kind='expense'), xem sheet `Events` bên dưới. Thêm 07/11/2026, cuối danh sách. **KHÔNG nằm trong công thức row_hash** — gắn/sửa event_id vào dòng sổ cái đã có không phá chuỗi chống sửa. |
 
 ## Entries
 Dòng sổ cái theo ví, số tiền có dấu (+ vào ví, − ra ví). Số dư ví = số dư đầu + tổng Entries từ ngày bắt đầu của ví.
@@ -184,6 +186,25 @@ Sổ cưới — sổ lưu trữ thuần (quyết định 07/11/2026): **không 
 | note | t | |
 | active | n | |
 | source_ref | t | Mã chống trùng khi nhập dữ liệu cũ (`imp:wedding:<STT cũ>`), rỗng với dòng tạo tay |
+
+## Events
+Sự kiện (chuyến đi/dịp cần biết chi tiêu riêng, vd đi du lịch, về quê, theo dõi chi phí vận hành xe...) — quyết định 07/11/2026. Chỉ gắn với giao dịch **Chi tiêu** (không áp dụng Thu nhập/Chuyển ví/Mua tài sản/...). Một giao dịch chỉ gắn **đúng 1** sự kiện (cột `event_id` ở `Transactions`). Ngày bắt đầu/kết thúc chỉ để tham khảo, **không bắt buộc** giao dịch phải nằm trong khoảng đó. "Bật tự gắn" là theo từng thành viên (`current_event_id` ở `Members`), không phải trạng thái chung toàn hệ thống.
+
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| event_id | t | |
+| name | t | |
+| scope | t | `shared` (chung cả nhà) \| `personal` (riêng, xem owner_member_id) |
+| owner_member_id | t | Chỉ có giá trị khi scope='personal' |
+| start_date | t | Không bắt buộc |
+| end_date | t | Không bắt buộc — để trống nếu theo dõi liên tục không xác định ngày kết thúc (vd chi phí vận hành xe) |
+| planned_budget | n | Một số tổng duy nhất cho cả sự kiện (không chia theo lọ); để trống = không đặt ngân sách |
+| status | t | `ongoing` (đang diễn ra, còn gắn/bật được) \| `ended` (đã kết thúc — khoá cứng: không gắn thêm giao dịch mới nào nữa dù tay hay tự động; ai đang bật sự kiện này cũng tự tắt) |
+| note | t | |
+| active | n | Ẩn/hiện; xoá cứng chỉ được khi chưa có giao dịch nào gắn (giống Assets/GoldLots) |
+| created_by | t | |
+| created_at | t | |
+| source_ref | t | Mã chống trùng khi nhập dữ liệu cũ (`imp:event:<ID cũ>`), rỗng với sự kiện tạo tay |
 
 ## Debts
 Sổ nợ cá nhân (vay mượn người quen) — khác `Liabilities` (nợ ngân hàng). Không có cột số dư: số dư còn nợ luôn tính từ `DebtEntries`, bắt đầu từ 0 (xem Ledger bên dưới).

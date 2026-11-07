@@ -1,6 +1,6 @@
 # Nhập dữ liệu lịch sử (Appsheet_Finance.xlsx)
 
-File gốc **không bao giờ bị sửa** (chỉ đọc). Phạm vi chính: sheet `finance` (4.504 dòng, 01/12/2022–07/08/2025) và `change` (369 dòng chuyển ví). Các sheet `setting`, `report`, `event`, `saving`, `cheppy_newborn` **chưa nhập** (không phải giao dịch; cần quyết định riêng khi cần). `gold` (9 dòng) và `wedding` (487 dòng) đã có quyết định và đã nhập xong — xem mục riêng ngay dưới đây.
+File gốc **không bao giờ bị sửa** (chỉ đọc). Phạm vi chính: sheet `finance` (4.504 dòng, 01/12/2022–07/08/2025) và `change` (369 dòng chuyển ví). Các sheet `setting`, `report`, `saving`, `cheppy_newborn` **chưa nhập** (không phải giao dịch; cần quyết định riêng khi cần). `gold` (9 dòng), `wedding` (487 dòng) và `event` (9 dòng, trong đó 6 được nhập thật) đã có quyết định và đã nhập xong — xem các mục riêng ngay dưới đây.
 
 ## Vàng + Sổ cưới — ĐÃ QUYẾT ĐỊNH VÀ NHẬP (07/11/2026)
 
@@ -13,6 +13,21 @@ Quy trình (chạy MỘT LẦN trong Apps Script Editor, sau khi đã `clasp pus
 4. Chạy kiểm tra toàn vẹn trong app (Thêm → Hệ thống) để xác nhận không có bất thường.
 
 Đã kiểm thử đầy đủ trên máy giả lập với đúng 9 dòng vàng + 487 dòng sổ cưới lấy từ `Appsheet_Finance.xlsx` thật (không lưu dữ liệu thật lên GitHub, chỉ lưu trong `ImportGoldWedding.gs` vì đây là thông tin đã được phép đưa vào code) — đối chiếu khớp tuyệt đối, chạy lại không nhân đôi (xem `Tests.gs`).
+
+## Sự kiện — ĐÃ QUYẾT ĐỊNH VÀ NHẬP (07/11/2026)
+
+Xem đầy đủ quy tắc ở `BUSINESS_RULES.md` mục "Sự kiện". Code nhập: `ImportEvents.gs` (`FF_EVENT_SEED` — 6 sự kiện, lấy trực tiếp từ sheet `event` gốc + cột "Sự kiện" trong sheet `finance`). Khác với Vàng/Sổ cưới (chỉ tạo dòng mới), bước này còn **gắn bổ sung `event_id`** vào các giao dịch Chi tiêu **đã nhập từ trước** (khớp theo `idempotency_key = 'imp:finance:<ID cũ>'`, vốn đã được `Import.gs` ghi sẵn khi nhập `finance`/`change`). Đã xác minh `event_id` không nằm trong công thức băm `row_hash` (xem `Ledger.gs`, `canon_()`), nên việc ghi bổ sung này **không** làm hỏng chuỗi chống sửa của sổ cái.
+
+Trong 9 sự kiện gốc: `Sinh hoạt` (mã mặc định, gắn 4.320/4.504 dòng — không phải dịp cụ thể) và `Mua xe` (nay đã có Khoản vay/Tài sản lo riêng, bỏ qua theo yêu cầu người dùng) **không được tạo sự kiện**; 6 sự kiện còn lại (174 dòng Chi tiêu) được nhập, trong đó "Cx-3" được hiểu lại thành theo dõi liên tục chi phí vận hành xe (trạng thái `ongoing`, không đặt ngày kết thúc) theo xác nhận của người dùng.
+
+**Yêu cầu tiên quyết**: phải chạy `importRun()` (nhập `finance`/`change`) **trước** — `importEvents()` chỉ gắn thẻ vào giao dịch đã tồn tại, không tự tạo giao dịch nào cho `finance`/`change`.
+
+Quy trình (chạy MỘT LẦN trong Apps Script Editor, sau khi `finance`/`change` đã nhập xong):
+1. `importEventsDryRun()` — xem báo cáo (6 sự kiện / 174 dòng chi tiêu cần gắn), không ghi gì.
+2. `importEvents()` — ghi thật: tạo 6 sự kiện + gắn `event_id` vào đúng 174 giao dịch Chi tiêu tương ứng đã nhập trước đó.
+3. Chạy kiểm tra toàn vẹn trong app (Thêm → Hệ thống) để xác nhận chuỗi `row_hash` vẫn sạch.
+
+Đã kiểm thử: tạo sẵn 2 giao dịch mẫu mang đúng `idempotency_key` kiểu `imp:finance:<ID>`, chạy `importEventsCore_` gắn đúng `event_id`, xác nhận `integrityScan_()` vẫn sạch sau khi gắn, và chạy lại không nhân đôi/gắn lại (xem `Tests.gs`).
 
 ## Nguyên tắc
 - Dữ liệu cũ là **lịch sử để báo cáo**: ngày nhập trước ngày bắt đầu của ví (01/11/2026) nên **không làm thay đổi số dư hiện tại**.

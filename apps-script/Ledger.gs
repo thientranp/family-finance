@@ -235,6 +235,20 @@ function goldLotOrThrow_(id) {
   throw ffErr_('GOLD', 'Lô vàng không tồn tại.');
 }
 
+// Chỉ dùng khi GẮN sự kiện vào một giao dịch Chi tiêu mới/sắp ghi — không áp dụng cho Thu nhập/
+// Chuyển ví/... (quyết định 07/11/2026). Sự kiện đã "kết thúc" (status='ended') bị khoá cứng: không
+// cho gắn thêm giao dịch mới, kể cả gắn tay.
+function eventOrThrow_(id) {
+  var es = readAll_('Events');
+  for (var i = 0; i < es.length; i++) {
+    if (es[i].event_id === id) {
+      if (es[i].status === 'ended') throw ffErr_('EVENT', 'Sự kiện "' + es[i].name + '" đã kết thúc, không gắn thêm giao dịch mới được nữa.');
+      return es[i];
+    }
+  }
+  throw ffErr_('EVENT', 'Sự kiện không tồn tại.');
+}
+
 // Validates a request and returns {plan} or {duplicate:true, txn_id}. Mutates st.
 function planPost_(st, memberId, spec) {
   var k = spec.kind;
@@ -247,7 +261,7 @@ function planPost_(st, memberId, spec) {
     txn_id: newId_('T'), txn_kind: k, txn_date: ymd_(spec.date, 'Ngày'), amount: 0,
     category_id: '', jar_id: '', paid_by: '', beneficiary: '', note: clip_(spec.note, 500), reason: '',
     balance_before: null, balance_after: null, reverses_id: '', ref_id: '', idempotency_key: key,
-    entry_count: 0, created_by: memberId, created_at: nowIso_(), prev_hash: '', row_hash: ''
+    entry_count: 0, created_by: memberId, created_at: nowIso_(), prev_hash: '', row_hash: '', event_id: ''
   };
   var ents = [], lents = [], dents = [], orig = null, cat, w, w2, jar, liab, asset, gold, debt;
 
@@ -273,6 +287,8 @@ function planPost_(st, memberId, spec) {
       if (k === 'expense') t.paid_by = memberIdOrThrow_(spec.paid_by, 'Người chi');
       else if (spec.paid_by) t.paid_by = memberIdOrThrow_(spec.paid_by, 'Người nhận hoàn');
       t.beneficiary = beneficiaryOrThrow_(spec.beneficiary);
+      // Sự kiện chỉ áp dụng cho Chi tiêu (quyết định 07/11/2026), không áp dụng Hoàn tiền.
+      if (k === 'expense' && spec.event_id) t.event_id = eventOrThrow_(spec.event_id).event_id;
       ents.push({ wallet_id: w.wallet_id, amount: k === 'expense' ? -t.amount : t.amount });
       break;
 
@@ -465,7 +481,7 @@ function postOne_(m, spec) {
 
 // ---------- Public-ish service helpers (called by Api.gs) ----------
 function svcIncome_(m, p) { return postOne_(m, { kind: 'income', date: p.date, amount: p.amount, wallet_id: p.wallet_id, category_id: p.category_id, beneficiary: p.beneficiary, note: p.note, key: p.key }); }
-function svcExpense_(m, p) { return postOne_(m, { kind: 'expense', date: p.date, amount: p.amount, wallet_id: p.wallet_id, jar_id: p.jar_id, category_id: p.category_id, paid_by: p.paid_by, beneficiary: p.beneficiary, note: p.note, key: p.key }); }
+function svcExpense_(m, p) { return postOne_(m, { kind: 'expense', date: p.date, amount: p.amount, wallet_id: p.wallet_id, jar_id: p.jar_id, category_id: p.category_id, paid_by: p.paid_by, beneficiary: p.beneficiary, note: p.note, key: p.key, event_id: p.event_id }); }
 function svcRefund_(m, p) { return postOne_(m, { kind: 'refund', date: p.date, amount: p.amount, wallet_id: p.wallet_id, jar_id: p.jar_id, category_id: p.category_id, paid_by: p.paid_by, beneficiary: p.beneficiary, note: p.note, key: p.key }); }
 function svcTransfer_(m, p) { return postOne_(m, { kind: 'transfer', date: p.date, amount: p.amount, from_wallet: p.from_wallet, to_wallet: p.to_wallet, note: p.note, key: p.key }); }
 function svcAdjust_(m, p) { return postOne_(m, { kind: 'adjustment', date: p.date || todayYmd_(), wallet_id: p.wallet_id, actual_balance: p.actual_balance, reason: p.reason, note: p.note, key: p.key }); }

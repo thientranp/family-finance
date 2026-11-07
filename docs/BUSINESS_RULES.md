@@ -76,6 +76,24 @@ Bổ sung/ghi đè một phần quyết định 06/11/2026 trong `DATA_MIGRATION
 - Sửa/xoá tự do, không qua cơ chế "chỉ ẩn khi đã có giao dịch" của Tài sản/Vàng — vì sổ cưới không có giao dịch sổ cái nào gắn với nó để mà khoá. [ĐÃ DUYỆT]
 - Dữ liệu lịch sử (sheet `wedding`, 487 dòng, 2 đám cưới 30/12/2022 và 11/02/2023, chưa từng nhập ở bất kỳ import nào trước đây): nhập toàn bộ, tổng 213.279.111đ + 12,2 chỉ vàng + 300 USD, không tạo giao dịch nào đi kèm. [ĐÃ DUYỆT 07/11/2026]
 
+## Sự kiện — quyết định 07/11/2026
+- Mục đích: khi đi du lịch, về quê, hoặc theo dõi một khoản chi lặp lại gắn với một chủ đề cụ thể (vd chi phí vận hành xe), biết được **tổng đã chi trong kỳ đó** mà vẫn phân loại theo đúng lọ ngân sách như bình thường (sự kiện là một **lớp gắn thẻ thêm**, không thay thế lọ/danh mục). [ĐÃ DUYỆT]
+- Chỉ gắn với giao dịch **Chi tiêu**; không áp dụng Thu nhập/Chuyển ví/Mua tài sản/Mua vàng/... [ĐÃ DUYỆT]
+- Một giao dịch chỉ gắn **đúng 1** sự kiện. [ĐÃ DUYỆT]
+- Ngày bắt đầu/kết thúc chỉ để hiển thị/tham khảo, **không bắt buộc** giao dịch phải nằm trong khoảng đó (vd mua sắm chuẩn bị trước chuyến đi, hoặc sự kiện theo dõi liên tục không có ngày kết thúc). [ĐÃ DUYỆT]
+- Sự kiện có thể **chung cả nhà** hoặc **riêng** của một thành viên (giống Ví). [ĐÃ DUYỆT]
+- **Ngân sách dự kiến**: một số tổng duy nhất cho cả sự kiện (không chia theo lọ), không bắt buộc. Trang chi tiết sự kiện hiển thị đã chi / còn lại / vượt — đây là một **lớp theo dõi bổ sung**, hoàn toàn độc lập với ngân sách theo lọ hằng tháng (một khoản chi vẫn tính vào ngân sách lọ của nó như bình thường, đồng thời tính luôn vào ngân sách sự kiện nếu được gắn). [ĐÃ DUYỆT]
+- **Trạng thái**: `ongoing` (đang diễn ra) | `ended` (đã kết thúc — khoá cứng, không gắn thêm giao dịch mới nào nữa dù gắn tay hay tự động; không mở lại được). [ĐÃ DUYỆT]
+- **"Bật tự gắn"**: theo từng thành viên (không phải trạng thái chung toàn hệ thống) — người nào bật thì chỉ giao dịch Chi tiêu do chính người đó tạo mới tự điền sẵn sự kiện đó; bật sự kiện mới tự tắt sự kiện cũ *của chính người đó*, không ảnh hưởng người khác. Tại một giao dịch cụ thể, người dùng vẫn **chọn tay được** sự kiện khác hoặc bỏ gắn để ghi đè — dùng cho trường hợp 2 sự kiện trùng ngày (ví dụ vừa về quê Tết vừa trùng sinh nhật con): bật 1 sự kiện làm mặc định, giao dịch thuộc sự kiện còn lại thì chọn tay. Kết thúc một sự kiện sẽ tự tắt cho bất kỳ ai đang bật nó. [ĐÃ DUYỆT]
+- Xoá: chỉ xoá được khi sự kiện chưa có giao dịch nào gắn vào; có rồi thì chỉ ẩn — giống Tài sản/Vàng. [ĐÃ DUYỆT]
+- Vàng đang giữ/Tài sản ròng: sự kiện **không** ảnh hưởng tính toán tài sản ròng (khác với Vàng/Tài sản) — chỉ là một chiều báo cáo cho dòng tiền chi tiêu.
+- Dữ liệu lịch sử (sheet `event`, 9 sự kiện gốc, cột "Sự kiện" trong sheet `finance` đã gắn sẵn cho toàn bộ 4.504 dòng):
+  - `Sinh hoạt` (gắn 4.320/4.504 dòng, 96%) là mã mặc định "không có dịp cụ thể" trong hệ thống cũ — **không tạo sự kiện**, các dòng này giữ nguyên không gắn sự kiện nào trong hệ thống mới. [ĐÃ DUYỆT 07/11/2026]
+  - `Mua xe` (5 dòng) trước đây dùng để quản lý khoản vay + mua xe; nay đã có `Liabilities`/`Assets` lo riêng → **bỏ qua theo yêu cầu người dùng**, không tạo sự kiện, 5 dòng chi tiêu cũ giữ nguyên không gắn sự kiện nào. [ĐÃ DUYỆT 07/11/2026]
+  - 6 sự kiện còn lại được nhập: "Về quê Quảng Trị (2024)", "Du lịch Vũng Tàu (5/2023)", "Du lịch Vũng Tàu (6/2024)", "Du lịch Phan Thiết (11/2023)", "Du lịch Phan Thiết (3/2025)" — cả 5 ở trạng thái `ended` (đã xong); và **"Cx-3 — chi phí vận hành xe"** được hiểu lại thành theo dõi liên tục chi phí xe (xăng, bảo trì, đăng kiểm, bảo hiểm...), trạng thái `ongoing`, không đặt ngày kết thúc — bật "tự gắn" khi cần ghi thêm chi phí xe mới về sau. [ĐÃ DUYỆT 07/11/2026, theo xác nhận trực tiếp của người dùng về ý nghĩa của "Cx-3"]
+  - Chỉ 174 dòng kiểu **Chi** được gắn; 5 dòng **Thu** dưới sự kiện "Về quê" không được gắn (đúng quy tắc: sự kiện chỉ áp dụng Chi tiêu). [ĐÃ DUYỆT]
+  - Kỹ thuật: gắn `event_id` bổ sung vào các giao dịch Chi tiêu **đã nhập từ trước** (khớp theo `idempotency_key`) — đã xác minh cột `event_id` không nằm trong công thức băm `row_hash`, nên thao tác này an toàn tuyệt đối với chuỗi chống sửa của sổ cái.
+
 ## Ngân sách
 - Theo tháng, số tiền cố định theo lọ; tháng mới sao chép từ tháng gần nhất trước đó. [ĐÃ DUYỆT]
 - Chỉ sửa được tháng hiện tại và tương lai; tháng đã qua giữ nguyên. Mọi thay đổi có nhật ký.

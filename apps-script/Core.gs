@@ -10,13 +10,18 @@ var FF_CTX = FF_CTX || { ss: null, cache: {}, asEmail: null, dryMail: false, mai
 // Column definitions: name:type  (t = text, n = number). Dates are stored as text yyyy-MM-dd.
 // Booleans are stored as numbers 1/0 to avoid spreadsheet coercion.
 var FF_SCHEMA = {
-  Members: 'member_id:t,display_name:t,email:t,active:n',
+  // current_event_id: thêm 07/11/2026 — "sự kiện đang bật" để tự gắn cho giao dịch Chi tiêu CỦA CHÍNH
+  // thành viên này (mỗi người một con trỏ riêng, không ảnh hưởng người khác). Trống = không bật gì.
+  Members: 'member_id:t,display_name:t,email:t,active:n,current_event_id:t',
   Wallets: 'wallet_id:t,name:t,wallet_type:t,bank_name:t,owner_member_id:t,holder_name:t,opening_balance:n,opening_date:t,status:t',
   Jars: 'jar_id:t,name:t,sort_order:n,active:n',
   Categories: 'category_id:t,name:t,kind:t,jar_id:t,active:n',
   Budgets: 'period:t,jar_id:t,amount:n,created_at:t,created_by:t',
   BudgetMoves: 'move_id:t,period:t,from_jar:t,to_jar:t,amount:n,reason:t,created_by:t,created_at:t',
-  Transactions: 'txn_id:t,txn_kind:t,txn_date:t,amount:n,category_id:t,jar_id:t,paid_by:t,beneficiary:t,note:t,reason:t,balance_before:n,balance_after:n,reverses_id:t,ref_id:t,idempotency_key:t,entry_count:n,created_by:t,created_at:t,prev_hash:t,row_hash:t',
+  // event_id: thêm 07/11/2026, cuối danh sách để setupCore_ tự vá cột cho sheet đã có dữ liệu. CHỦ Ý:
+  // cột này KHÔNG nằm trong canon_()/hashOf_() (xem Ledger.gs) nên gắn/sửa event_id cho dòng sổ cái
+  // đã có KHÔNG làm hỏng chuỗi row_hash chống sửa — an toàn khi nhập/gắn lại dữ liệu cũ.
+  Transactions: 'txn_id:t,txn_kind:t,txn_date:t,amount:n,category_id:t,jar_id:t,paid_by:t,beneficiary:t,note:t,reason:t,balance_before:n,balance_after:n,reverses_id:t,ref_id:t,idempotency_key:t,entry_count:n,created_by:t,created_at:t,prev_hash:t,row_hash:t,event_id:t',
   Entries: 'entry_id:t,txn_id:t,wallet_id:t,amount:n',
   Assets: 'asset_id:t,asset_type:t,name:t,purchase_value:n,purchase_date:t,note:t,active:n',
   Liabilities: 'liability_id:t,name:t,original_amount:n,opening_balance:n,opening_date:t,status:t,term_months:n',
@@ -43,6 +48,17 @@ var FF_SCHEMA = {
   // source_ref: mã chống trùng khi nhập dữ liệu cũ từ Excel (vd "imp:wedding:<STT cũ>"), rỗng với
   // dòng tạo tay qua UI — dùng để importWeddingGifts_ chạy lại nhiều lần không bị nhân đôi.
   WeddingGifts: 'gift_id:t,wedding_date:t,side:t,guest_name:t,address:t,cash_amount:n,gold_amount:n,usd_amount:n,relationship:t,payment_method:t,repaid:n,note:t,active:n,source_ref:t',
+  // Sự kiện (chuyến đi/dịp cần biết tổng chi) — quyết định 07/11/2026. Chỉ gắn với giao dịch loại
+  // Chi tiêu (không áp dụng Thu nhập/Chuyển ví/...). Một giao dịch chỉ gắn ĐÚNG 1 sự kiện (xem cột
+  // event_id ở Transactions). scope: 'shared' (chung cả nhà) | 'personal' (riêng, owner_member_id).
+  // start_date/end_date: chỉ để hiển thị/tham khảo, KHÔNG bắt buộc giao dịch phải nằm trong khoảng
+  // này (có thể để trống end_date cho sự kiện kéo dài không xác định, vd theo dõi chi phí vận hành
+  // xe). planned_budget: một số tổng duy nhất cho cả sự kiện (không chia theo lọ), có thể để trống =
+  // không đặt ngân sách. status: 'ongoing' (đang diễn ra, còn gắn/bật được) | 'ended' (đã kết thúc —
+  // khoá cứng: không gắn thêm giao dịch mới nào nữa, tay hoặc tự động; ai đang bật sự kiện này cũng
+  // tự tắt). Xoá: chỉ xoá cứng được khi chưa có giao dịch nào gắn (giống Assets/GoldLots), có rồi thì
+  // chỉ ẩn (active=0). source_ref: mã chống trùng khi nhập dữ liệu cũ (vd "imp:event:<ID cũ>").
+  Events: 'event_id:t,name:t,scope:t,owner_member_id:t,start_date:t,end_date:t,planned_budget:n,status:t,note:t,active:n,created_by:t,created_at:t,source_ref:t',
   Reminders: 'reminder_id:t,type:t,title:t,day_of_month:n,days_before:n,ref_id:t,active:n',
   Notifications: 'key:t,created_at:t,to:t,subject:t,status:t,attempts:n,last_error:t',
   AuditLog: 'ts:t,actor:t,action:t,ref_id:t,details:t',

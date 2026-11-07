@@ -18,6 +18,10 @@ const goldLot = call('createGoldLot', { brand: 'PNJ mẫu', quantity: 2, purchas
 call('goldBuy', { date: today, amount: 13000000, wallet_id: 'W001', lot_id: goldLot.lot_id });
 call('createWeddingGift', { wedding_date: '2022-12-30', side: 'Anh', guest_name: 'Bác Ba mẫu', address: 'Quảng Ngãi', cash_amount: 4000000, relationship: 'Nội', payment_method: 'Tiền mặt' });
 call('createWeddingGift', { wedding_date: '2022-12-30', side: 'Em', guest_name: 'GĐ Thanh - Nhung mẫu', address: 'Hoàn Cát', gold_amount: 0.5, relationship: 'Gia đình', payment_method: 'Vàng', repaid: true });
+const ev1 = call('createEvent', { name: 'Du lịch Đà Lạt mẫu', start_date: today, planned_budget: 5000000 }).data;
+call('setCurrentEvent', { event_id: ev1.event_id });
+call('expense', { date: today, amount: 350000, wallet_id: 'W001', category_id: cats[0].category_id, paid_by: 'M01', beneficiary: 'FAMILY', note: 'Ăn uống mẫu', event_id: ev1.event_id, key: 'seed-evt-1' });
+call('createEvent', { name: 'Cx-3 mẫu — chi phí vận hành xe', start_date: today, status: 'ongoing' });
 const j = call('budget', {}).data; j.jars.forEach((x, i) => call('setBudget', { period: j.period, jar_id: x.jar_id, amount: 3000000 + i * 500000 }));
 const shim = `<script>window.google={script:{run:(function(){function mk(s,f){return new Proxy({},{get:function(_,p){if(p==='withSuccessHandler')return function(h){return mk(h,f)};if(p==='withFailureHandler')return function(h){return mk(s,h)};return function(){var a=[].slice.call(arguments);fetch('/rpc',{method:'POST',body:JSON.stringify({fn:p,args:a})}).then(function(r){return r.text()}).then(function(t){s&&s(t)},function(e){f&&f(e)})}}})}return mk()})()}};</script>`;
 const port = +process.argv[2] || 8765;
